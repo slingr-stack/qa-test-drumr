@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { hasDrumrFramework } from '../../utils/checkFramework.js';
@@ -25,6 +25,15 @@ const INTEGRATION_DIRS = [
   'backend/tests/integration',
 ];
 
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function setupTests(cwd: string = process.cwd()): Promise<void> {
   if (!(await hasDrumrFramework(cwd))) {
     console.error(
@@ -39,8 +48,8 @@ export async function setupTests(cwd: string = process.cwd()): Promise<void> {
 
   for (const dir of allDirs) {
     const abs = path.join(cwd, dir);
-    if (!(await fs.pathExists(abs))) {
-      await fs.ensureDir(abs);
+    if (!(await pathExists(abs))) {
+      await fsp.mkdir(abs, { recursive: true });
       console.log(`  created  ${dir}/`);
       directoriesCreated++;
     }
@@ -48,11 +57,11 @@ export async function setupTests(cwd: string = process.cwd()): Promise<void> {
 
   const testPlansPath = path.join(cwd, TEST_PLANS_FILE);
 
-  if (await fs.pathExists(testPlansPath)) {
+  if (await pathExists(testPlansPath)) {
     console.log(`  exists   ${path.relative(cwd, testPlansPath)} (skipped)`);
   } else {
-    await fs.ensureDir(path.dirname(testPlansPath));
-    await fs.writeJson(testPlansPath, DEFAULT_TEST_PLANS, { spaces: 2 });
+    await fsp.mkdir(path.dirname(testPlansPath), { recursive: true });
+    await fsp.writeFile(testPlansPath, JSON.stringify(DEFAULT_TEST_PLANS, null, 2), 'utf-8');
     console.log(`  created  ${path.relative(cwd, testPlansPath)}`);
   }
 

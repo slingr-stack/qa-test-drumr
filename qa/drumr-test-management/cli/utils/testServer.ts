@@ -1,10 +1,19 @@
 import http from 'node:http';
 import path from 'node:path';
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 import { collectTestsFromApp, type CollectedTest } from './testCollector.js';
 import { clearLatestRunStatus, readLatestRunStatus, readRunStatus } from './testRunState';
 import { startBackgroundTestRun } from './testRunPlanner';
 import { readJestCaseSummary, readPlaywrightCaseSummary } from './testResultParser';
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export interface TestPlanCase {
   id: string;
@@ -69,12 +78,13 @@ const APP_LOGO_CANDIDATES = [
 
 async function loadTestPlans(appRoot: string): Promise<TestPlansLoadResult> {
   const testPlansPath = path.join(appRoot, ...TEST_PLANS_PATH);
-  if (!(await fs.pathExists(testPlansPath))) {
+  if (!(await pathExists(testPlansPath))) {
     return { ok: true, data: { plans: [], caseFolders: [], collectedTests: [] } };
   }
 
   try {
-    const data = await fs.readJson(testPlansPath) as TestPlansFile;
+    const content = await fsp.readFile(testPlansPath, 'utf-8');
+    const data = JSON.parse(content) as TestPlansFile;
     return {
       ok: true,
       data: {
@@ -98,8 +108,8 @@ async function loadTestPlans(appRoot: string): Promise<TestPlansLoadResult> {
 
 async function saveTestPlans(appRoot: string, data: TestPlansFile): Promise<void> {
   const testPlansPath = path.join(appRoot, ...TEST_PLANS_PATH);
-  await fs.ensureDir(path.dirname(testPlansPath));
-  await fs.writeJson(testPlansPath, data, { spaces: 2 });
+  await fsp.mkdir(path.dirname(testPlansPath), { recursive: true });
+  await fsp.writeFile(testPlansPath, JSON.stringify(data, null, 2), 'utf-8');
 }
 
 function json(res: http.ServerResponse, statusCode: number, body: unknown): void {
@@ -120,7 +130,7 @@ function readBody(req: http.IncomingMessage): Promise<string> {
 async function findAppLogo(appRoot: string): Promise<{ filePath: string; publicUrl: string } | null> {
   for (const candidate of APP_LOGO_CANDIDATES) {
     const filePath = path.join(appRoot, ...candidate);
-    if (await fs.pathExists(filePath)) {
+    if (await pathExists(filePath)) {
       return {
         filePath,
         publicUrl: `/app-logo${path.extname(filePath).toLowerCase()}`,
@@ -161,11 +171,11 @@ async function readRunLogTail(appRoot: string, runId: string, maxLines = 160): P
   }
 
   const logPath = path.join(appRoot, run.logFileRelativePath);
-  if (!(await fs.pathExists(logPath))) {
+  if (!(await pathExists(logPath))) {
     return '';
   }
 
-  const content = await fs.readFile(logPath, 'utf-8');
+  const content = await fsp.readFile(logPath, 'utf-8');
   const lines = content.split(/\r?\n/);
   return lines.slice(-maxLines).join('\n');
 }
@@ -239,7 +249,8 @@ export async function createTestServer(
 ): Promise<http.Server> {
   let appName = path.basename(appRoot);
   try {
-    const pkg = await fs.readJson(path.join(appRoot, 'package.json'));
+    const pkgContent = await fsp.readFile(path.join(appRoot, 'package.json'), 'utf-8');
+    const pkg = JSON.parse(pkgContent);
     if (pkg.name) {
 appName = pkg.name as string;
 }
@@ -284,7 +295,7 @@ appName = pkg.name as string;
 
       if (appLogo && url === appLogo.publicUrl && method === 'GET') {
         try {
-          const content = await fs.readFile(appLogo.filePath);
+          const content = await fsp.readFile(appLogo.filePath);
           res.writeHead(200, { 'Content-Type': getContentType(appLogo.filePath) });
           res.end(content);
         } catch {
@@ -413,7 +424,7 @@ appName = pkg.name as string;
 
       if (method === 'GET') {
         try {
-          const html = await fs.readFile(htmlPath, 'utf-8');
+          const html = await fsp.readFile(htmlPath, 'utf-8');
           res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
           res.end(html);
         } catch {

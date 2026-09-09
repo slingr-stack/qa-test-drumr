@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 import {
   type PersistentTestRunCase,
   getTestManagerDir,
@@ -248,7 +248,7 @@ export async function startBackgroundTestRun(
   spawnProcess: SpawnProcess = spawn as unknown as SpawnProcess,
 ): Promise<BackgroundTestRunPlan> {
   const plan = planBackgroundTestRun(appRoot, label, cases);
-  await fs.ensureDir(path.dirname(plan.logFilePath));
+  await fsp.mkdir(path.dirname(plan.logFilePath), { recursive: true });
 
   const runCases: PersistentTestRunCase[] = plan.commands.map(command => withOptionalProps({
     name: command.label,
@@ -278,7 +278,7 @@ export async function startBackgroundTestRun(
     commands: plan.commands,
   };
 
-  await fs.writeJson(payloadPath, payload, { spaces: 2 });
+  await fsp.writeFile(payloadPath, JSON.stringify(payload, null, 2), 'utf-8');
 
   const runnerPath = path.join(__dirname, 'backgroundTestRunner.js');
   const child = spawnProcess(process.execPath, [runnerPath, payloadPath], {

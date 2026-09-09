@@ -1,5 +1,14 @@
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 import type { TestExecutionStatus } from './testRunState';
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface ResultMatcher {
   fullName?: string;
@@ -85,11 +94,12 @@ function pickMatcherTitle(matcher: ResultMatcher): string | undefined {
 }
 
 async function readJestCaseResultSummary(resultFilePath: string, matcher: ResultMatcher = {}): Promise<TestCaseResultSummary | null> {
-  if (!(await fs.pathExists(resultFilePath))) {
+  if (!(await pathExists(resultFilePath))) {
     return null;
   }
 
-  const data = await fs.readJson(resultFilePath) as {
+  const content = await fsp.readFile(resultFilePath, 'utf-8');
+  const data = JSON.parse(content) as {
     numFailedTests?: number;
     numPassedTests?: number;
     numPendingTests?: number;
@@ -169,11 +179,12 @@ async function readJestCaseResultSummary(resultFilePath: string, matcher: Result
 }
 
 async function readPlaywrightCaseResultSummary(resultFilePath: string, matcher: ResultMatcher = {}): Promise<TestCaseResultSummary | null> {
-  if (!(await fs.pathExists(resultFilePath))) {
+  if (!(await pathExists(resultFilePath))) {
     return null;
   }
 
-  const data = await fs.readJson(resultFilePath) as Record<string, unknown> & {
+  const content = await fsp.readFile(resultFilePath, 'utf-8');
+  const data = JSON.parse(content) as Record<string, unknown> & {
     errors?: Array<{ message?: string; stack?: string; snippet?: string }>;
   };
   const tests: Array<{

@@ -1,0 +1,44 @@
+{
+  "name": "@drumr/test-management",
+  "version": "1.0.0-beta.1",
+  "description": "Drumr Test Manager extension and CLI presets. Parses, manages, and executes test suites (Unit, Integration, E2E) across a Drumr application workspace.",
+  "main": "./dist/cli/commands/tests/open.js",
+  "types": "./dist/cli/commands/tests/open.d.ts",
+  "bin": {
+    "drumr-test-manager": "./dist/cli/bin/test-manager.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/cli/commands/tests/open.d.ts",
+      "require": "./dist/cli/commands/tests/open.js",
+      "default": "./dist/cli/commands/tests/open.js"
+    },
+    "./open": {
+      "types": "./dist/cli/commands/tests/open.d.ts",
+      "require": "./dist/cli/commands/tests/open.js",
+      "default": "./dist/cli/commands/tests/open.js"
+    },
+    "./setup": {
+      "types": "./dist/cli/commands/tests/setup.d.ts",
+      "require": "./dist/cli/commands/tests/setup.js",
+      "default": "./dist/cli/commands/tests/setup.js"
+    }
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && pnpm run copy-assets",
+    "copy-assets": "node scripts/copy-assets.mjs",
+    "clean": "node scripts/clean.mjs"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "registry": "https://us-central1-npm.pkg.dev/future-name-492914-n5/drumr-npm/",
+    "access": "restricted"
+  }
+}

@@ -1,19 +1,29 @@
 import * as path from 'node:path';
-import * as fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 
 export function getBackendPath(cwd: string = process.cwd()): string {
   return path.join(cwd, 'backend');
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function hasDrumrFramework(cwd: string = process.cwd()): Promise<boolean> {
   const backendPath = getBackendPath(cwd);
   const packageJsonPath = path.join(backendPath, 'package.json');
 
-  if (!(await fs.pathExists(packageJsonPath))) {
+  if (!(await pathExists(packageJsonPath))) {
     return false;
   }
 
-  const packageJson = await fs.readJSON(packageJsonPath);
+  const content = await fsp.readFile(packageJsonPath, 'utf-8');
+  const packageJson = JSON.parse(content);
   const deps = packageJson.dependencies || {};
   const devDeps = packageJson.devDependencies || {};
 
@@ -29,13 +39,13 @@ export async function getFrameworkPath(cwd: string = process.cwd()): Promise<str
   ];
 
   for (const frameworkPath of candidates) {
-    if (!(await fs.pathExists(frameworkPath))) {
+    if (!(await pathExists(frameworkPath))) {
       continue;
     }
 
-    const stats = await fs.lstat(frameworkPath);
+    const stats = await fsp.lstat(frameworkPath);
     if (stats.isSymbolicLink()) {
-      return await fs.realpath(frameworkPath);
+      return await fsp.realpath(frameworkPath);
     }
 
     return frameworkPath;

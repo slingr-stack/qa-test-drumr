@@ -1,0 +1,2366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Drumr Test Manager</title>
+  <style>
+    /* ── Reset & Variables ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0d1117;
+      --bg2:         #161b22;
+      --bg3:         #1f2937;
+      --border:      #30363d;
+      --text:        #e6edf3;
+      --text-muted:  #7d8590;
+      --accent:      #2f81f7;
+      --accent-dim:  #1a4a8a;
+      --success:     #3fb950;
+      --error:       #f85149;
+      --warning:     #d29922;
+      --pending:     #6e7681;
+      --unit-color:  #58a6ff;
+      --int-color:   #bc8cff;
+      --e2e-color:   #56d364;
+      --sidebar-w:   280px;
+      --header-h:    48px;
+      --radius:      6px;
+      --font:        -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    }
+
+    :root[data-theme="light"] {
+      --bg:          #d8dfeb;
+      --bg2:         #faf7f8;
+      --bg3:         #edf3fb;
+      --border:      #d8e2f0;
+      --text:        #182433;
+      --text-muted:  #607086;
+      --accent:      #2563eb;
+      --accent-dim:  #dfeafe;
+      --success:     #16a34a;
+      --error:       #dc2626;
+      --warning:     #d97706;
+      --pending:     #8ea0b8;
+      --unit-color:  #2563eb;
+      --int-color:   #7c3aed;
+      --e2e-color:   #16a34a;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; line-height: 1.5; }
+
+    /* ── Scrollbar ─────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* ── Layout ────────────────────────────────────────────────────────── */
+    #app { display: flex; flex-direction: column; height: 100%; }
+
+    header {
+      height: var(--header-h);
+      background: var(--bg2);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center;
+      padding: 0 16px; gap: 12px;
+      flex-shrink: 0; z-index: 10;
+    }
+
+    .header-app {
+      display: flex; align-items: center; gap: 12px; min-width: 0;
+      padding: 6px 14px 6px 10px; 
+    }
+    .header-app-logo {
+      width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+      display: none; align-items: center; justify-content: center;
+      background: rgba(13, 17, 23, 0.9); border: 1px solid rgba(48, 54, 61, 0.95);
+      overflow: hidden;
+    }
+    .header-app-logo.visible { display: inline-flex; }
+    .header-app-logo img {
+      width: 100%; height: 100%; object-fit: contain; display: block;
+      background: rgba(255,255,255,0.02);
+    }
+    .header-app-copy { min-width: 0; display: flex; flex-direction: column; }
+    .header-app-kicker {
+      font-size: 10px; line-height: 1; text-transform: uppercase; letter-spacing: 0.12em;
+      color: var(--text-muted); margin-bottom: 4px;
+    }
+    .header-app-title {
+      font-size: 16px; line-height: 1.1; font-weight: 700; color: var(--text);
+      max-width: 460px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .header-app-title.is-loading { color: var(--text-muted); font-weight: 600; }
+
+    .header-spacer { flex: 1; }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+
+    .theme-toggle {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 8px 4px 10px; border-radius: 999px;
+      border: 1px solid var(--border); background: var(--bg3);
+      color: var(--text-muted); font-size: 11px; font-weight: 600;
+      user-select: none;
+    }
+    .theme-toggle input {
+      position: absolute; opacity: 0; pointer-events: none;
+    }
+    .theme-toggle-label {
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .theme-toggle-switch {
+      width: 38px; height: 22px; border-radius: 999px;
+      background: var(--border); position: relative; transition: background 0.2s ease;
+      box-shadow: inset 0 0 0 1px rgba(0,0,0,0.05);
+    }
+    .theme-toggle-switch::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--bg2); box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .theme-toggle input:checked + .theme-toggle-switch {
+      background: var(--accent);
+    }
+    .theme-toggle input:checked + .theme-toggle-switch::after {
+      transform: translateX(16px);
+    }
+
+    /* ── Buttons ───────────────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      border-radius: var(--radius); padding: 5px 12px; font-size: 12px;
+      font-family: var(--font); cursor: pointer; font-weight: 500;
+      transition: background 0.15s, border-color 0.15s; border: 1px solid;
+      user-select: none; white-space: nowrap;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-primary:not(:disabled):hover { background: #388bfd; border-color: #388bfd; }
+    .btn-secondary { background: var(--bg3); border-color: var(--border); color: var(--text); }
+    .btn-secondary:not(:disabled):hover { background: #2d3748; border-color: #444c56; }
+    .btn-ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+    .btn-ghost:not(:disabled):hover { background: var(--bg3); color: var(--text); }
+    .btn-danger { background: transparent; border-color: var(--error); color: var(--error); }
+    .btn-danger:not(:disabled):hover { background: rgba(248,81,73,0.1); }
+    .btn-icon { padding: 5px 8px; }
+
+    /* ── Main split ────────────────────────────────────────────────────── */
+    #main { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ───────────────────────────────────────────────────────── */
+    #sidebar {
+      width: var(--sidebar-w); min-width: 220px; max-width: 640px; flex-shrink: 0;
+      background: var(--bg2); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar-search {
+      padding: 8px; flex-shrink: 0; border-bottom: 1px solid var(--border);
+    }
+    .sidebar-search input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text); font-family: var(--font);
+      font-size: 12px; padding: 5px 8px; outline: none;
+    }
+    .sidebar-search input:focus { border-color: var(--accent); }
+    .sidebar-search input::placeholder { color: var(--text-muted); }
+
+    .sidebar-panels {
+      flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .sidebar-pane {
+      display: flex; flex-direction: column; min-height: 140px; overflow: hidden;
+    }
+    .sidebar-pane-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 8px 4px; font-size: 11px; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+      border-bottom: 1px solid rgba(48, 54, 61, 0.55);
+      background: linear-gradient(180deg, rgba(22,27,34,0.98), rgba(22,27,34,0.9));
+      flex-shrink: 0;
+    }
+    .sidebar-pane-header-main {
+      display: flex; align-items: center; gap: 8px; min-width: 0;
+    }
+    .sidebar-pane-header-title {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .sidebar-pane-body {
+      flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 8px;
+    }
+    .sidebar-pane.empty .sidebar-pane-body {
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pane-empty-state {
+      padding: 16px 12px; color: var(--text-muted); font-size: 11px; text-align: center;
+    }
+    .resize-handle {
+      flex-shrink: 0; position: relative; background: var(--bg2);
+    }
+    .resize-handle:hover::before,
+    .resize-handle.is-dragging::before {
+      background: rgba(47, 129, 247, 0.45);
+    }
+    .resize-handle::before {
+      content: ''; position: absolute; background: rgba(48, 54, 61, 0.9);
+      transition: background 0.15s ease;
+    }
+    .resize-handle.horizontal {
+      height: 10px; cursor: row-resize;
+    }
+    .resize-handle.horizontal::before {
+      left: 8px; right: 8px; top: 4px; height: 2px; border-radius: 999px;
+    }
+    .resize-handle.vertical {
+      width: 10px; cursor: col-resize;
+    }
+    .resize-handle.vertical::before {
+      top: 8px; bottom: 8px; left: 4px; width: 2px; border-radius: 999px;
+    }
+
+    .section-header-actions { display: flex; gap: 2px; }
+
+    /* ── Tree ──────────────────────────────────────────────────────────── */
+    .tree-node {
+      display: flex; align-items: center; gap: 0; cursor: pointer;
+      border-radius: 4px; transition: background 0.1s;
+      white-space: nowrap; overflow: hidden;
+      position: relative;
+    }
+    .tree-node:hover { background: var(--bg3); }
+    .tree-node.active { background: var(--accent-dim); }
+    .tree-node.active .tree-label { color: var(--text); }
+
+    .tree-indent { display: flex; flex-shrink: 0; }
+    .tree-indent-unit { width: 16px; flex-shrink: 0; }
+
+    .tree-arrow {
+      width: 16px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; color: var(--text-muted); transition: transform 0.15s;
+    }
+    .tree-arrow.open { transform: rotate(90deg); }
+    .tree-arrow svg { display: block; }
+
+    .tree-icon { flex-shrink: 0; margin-right: 5px; display: flex; align-items: center; }
+    .tree-label { color: var(--text-muted); font-size: 12px; flex: 1; overflow: hidden; text-overflow: ellipsis; padding: 3px 0; }
+    .tree-label strong { color: var(--text); font-weight: 400; }
+    .tree-count { font-size: 11px; color: var(--text-muted); margin-right: 4px; flex-shrink: 0; }
+
+    .tree-actions { display: none; gap: 2px; margin-right: 4px; flex-shrink: 0; }
+    .tree-node:hover .tree-actions { display: flex; }
+    .tree-action-btn {
+      background: transparent; border: none; cursor: pointer;
+      color: var(--text-muted); padding: 2px 3px; border-radius: 3px;
+      display: flex; align-items: center;
+    }
+    .tree-action-btn:hover { background: var(--bg); color: var(--text); }
+
+    /* ── Content panel ─────────────────────────────────────────────────── */
+    #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+    .content-toolbar {
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+      background: var(--bg2);
+    }
+    .run-progress {
+      padding: 10px 16px 12px; border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(47,129,247,0.08), rgba(47,129,247,0.02));
+      display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+    }
+    .run-progress.hidden { display: none !important; }
+    .run-progress-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .run-progress-title {
+      display: flex; align-items: center; gap: 8px; min-width: 0;
+      font-size: 12px; color: var(--text); font-weight: 600;
+    }
+    .run-progress-title span:last-child {
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .run-progress-state {
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--accent);
+      flex-shrink: 0;
+    }
+    .run-progress-track {
+      width: 100%; height: 10px; border-radius: 999px; overflow: hidden;
+      background: rgba(125,133,144,0.24); border: 1px solid rgba(48,54,61,0.7);
+    }
+    .run-progress-fill {
+      height: 100%; border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #56a3ff);
+      transition: width 0.2s ease;
+    }
+    .run-progress-meta {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      font-size: 11px; color: var(--text-muted);
+    }
+    .run-progress-stats {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    }
+    .run-progress-stat strong { color: var(--text); font-weight: 600; }
+    .run-log {
+      margin-top: 4px;
+      background: rgba(13,17,23,0.55);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .run-log summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 8px 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+      user-select: none;
+    }
+    .run-log summary::-webkit-details-marker { display: none; }
+    .run-log pre {
+      margin: 0;
+      padding: 0 10px 10px;
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 11px;
+      line-height: 1.45;
+      color: var(--text);
+      font-family: "SF Mono", Consolas, monospace;
+    }
+    .breadcrumb { display: flex; align-items: center; gap: 6px; flex: 1; overflow: hidden; }
+    .breadcrumb-item {
+      font-size: 12px; color: var(--text-muted); white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+    .breadcrumb-item.active { color: var(--text); }
+    .breadcrumb-sep { color: var(--border); font-size: 14px; flex-shrink: 0; }
+
+    .content-scroll { flex: 1; overflow-y: auto; padding: 16px; }
+
+    /* ── Empty state ───────────────────────────────────────────────────── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; gap: 12px; color: var(--text-muted); text-align: center;
+    }
+    .empty-state svg { opacity: 0.3; }
+    .empty-state h3 { font-size: 15px; color: var(--text); font-weight: 500; }
+    .empty-state p { font-size: 12px; max-width: 280px; line-height: 1.6; }
+
+    /* ── Test case grid ────────────────────────────────────────────────── */
+    .tc-grid { display: flex; flex-direction: column; gap: 6px; }
+
+    .tc-card {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px;
+      display: flex; align-items: flex-start; gap: 12px;
+      transition: border-color 0.15s;
+    }
+    .tc-card:hover { border-color: #444c56; }
+
+    .tc-status-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px;
+    }
+    .tc-status-dot.passed  { background: var(--success); }
+    .tc-status-dot.failed  { background: var(--error); }
+    .tc-status-dot.pending { background: var(--warning); box-shadow: 0 0 0 1px var(--warning); background: transparent; border: 2px solid var(--warning); width: 8px; height: 8px; }
+    .tc-status-dot.skipped { background: var(--pending); }
+
+    .tc-body { flex: 1; min-width: 0; }
+    .tc-title { font-size: 13px; color: var(--text); font-weight: 500; line-height: 1.4; }
+    .tc-meta { margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .tc-id { font-size: 11px; font-weight: 600; color: var(--accent); }
+    .tc-spec { font-size: 11px; color: var(--text-muted); font-family: "SF Mono", Consolas, monospace; }
+    .tc-type-badge {
+      font-size: 10px; font-weight: 600; padding: 1px 6px; border-radius: 10px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .tc-type-badge.unit { background: rgba(88,166,255,0.12); color: var(--unit-color); }
+    .tc-type-badge.int  { background: rgba(188,140,255,0.12); color: var(--int-color); }
+    .tc-type-badge.e2e  { background: rgba(86,211,100,0.12); color: var(--e2e-color); }
+
+    .tc-actions { display: flex; gap: 6px; flex-shrink: 0; align-self: center; }
+
+    /* ── Collected test items ──────────────────────────────────────────── */
+    .ct-item {
+      display: flex; align-items: center; padding: 5px 12px 5px 8px;
+      border-radius: 4px; gap: 8px; cursor: default;
+    }
+    .ct-item:hover { background: var(--bg3); }
+    .ct-item.selected { background: rgba(47,129,247,0.12); }
+    .ct-item input[type="checkbox"] {
+      cursor: pointer; flex-shrink: 0;
+    }
+    .ct-type-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .ct-type-dot.unit { background: var(--unit-color); }
+    .ct-type-dot.int  { background: var(--int-color); }
+    .ct-type-dot.e2e  { background: var(--e2e-color); }
+    .ct-name { flex: 1; font-size: 11.5px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ct-name:hover { color: var(--text); }
+    .ct-add-btn {
+      background: transparent; border: 1px solid var(--border); border-radius: 3px;
+      color: var(--text-muted); font-size: 10px; padding: 1px 6px; cursor: pointer;
+      display: none; transition: all 0.1s;
+    }
+    .ct-item:hover .ct-add-btn { display: block; }
+    .ct-add-btn:hover { border-color: var(--accent); color: var(--accent); }
+    
+    /* ── Multi-select toolbar ──────────────────────────────────────────── */
+    .multiselect-toolbar {
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(47,129,247,0.06), rgba(47,129,247,0.02));
+      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+    }
+    .multiselect-info {
+      font-size: 12px; color: var(--text); font-weight: 500; flex: 1;
+    }
+    .multiselect-actions {
+      display: flex; gap: 8px;
+    }
+
+    /* ── Drag & Drop ───────────────────────────────────────────────────────── */
+    .tc-draggable { cursor: grab; user-select: none; }
+    .tc-draggable:active { cursor: grabbing; }
+    .drag-handle { color: var(--text-muted); font-size: 11px; margin-right: 4px; flex-shrink: 0; opacity: 0.4; line-height: 1; }
+    .tc-draggable:hover .drag-handle { opacity: 0.85; }
+    .tree-node.drag-over { background: rgba(47,129,247,0.14) !important; box-shadow: inset 0 0 0 1px rgba(47,129,247,0.55); }
+    .folder-drop-hint { font-size: 11px; color: var(--text-muted); pointer-events: none; padding: 3px 0 3px; }
+
+    /* ── Loading spinner ───────────────────────────────────────────────── */
+    .spinner {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-overlay {
+      position: fixed; inset: 0; background: rgba(13,17,23,0.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000; gap: 12px; font-size: 14px; color: var(--text-muted);
+    }
+
+    /* ── Modal ─────────────────────────────────────────────────────────── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .modal {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: 10px; width: 460px; max-width: 95vw;
+      display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.5);
+    }
+    .modal-header {
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-header h3 { font-size: 14px; font-weight: 600; }
+    .modal-close {
+      background: transparent; border: none; cursor: pointer;
+      color: var(--text-muted); font-size: 18px; line-height: 1; padding: 2px 6px;
+      border-radius: 4px;
+    }
+    .modal-close:hover { background: var(--bg3); color: var(--text); }
+    .modal-body { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-footer { padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-label { font-size: 12px; font-weight: 500; color: var(--text); }
+    .form-input, .form-select {
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius); color: var(--text);
+      font-family: var(--font); font-size: 13px; padding: 7px 10px; outline: none;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--accent); }
+    .form-select option { background: var(--bg2); }
+    .form-hint { font-size: 11px; color: var(--text-muted); }
+
+    /* ── Toast ─────────────────────────────────────────────────────────── */
+    #toast-container {
+      position: fixed; bottom: 16px; right: 16px;
+      display: flex; flex-direction: column; gap: 8px; z-index: 200;
+    }
+    .toast {
+      background: var(--bg2); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px; font-size: 12px;
+      max-width: 300px; display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+      animation: slideIn 0.2s ease;
+    }
+    .toast.success { border-left: 3px solid var(--success); }
+    .toast.error   { border-left: 3px solid var(--error); }
+    .toast.info    { border-left: 3px solid var(--accent); }
+    @keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+    /* ── Misc ──────────────────────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 4px 0; }
+    .text-muted { color: var(--text-muted); }
+    .hidden { display: none !important; }
+
+    .plan-section-title {
+      font-size: 12px; font-weight: 600; color: var(--text); margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .plan-section-title .count-badge {
+      background: var(--bg3); border: 1px solid var(--border);
+      border-radius: 10px; padding: 1px 8px; font-size: 11px;
+      font-weight: 400; color: var(--text-muted);
+    }
+
+    .add-case-zone {
+      border: 1px dashed var(--border); border-radius: var(--radius);
+      padding: 10px 16px; text-align: center; font-size: 12px;
+      color: var(--text-muted); cursor: pointer; margin-top: 8px;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .add-case-zone:hover { border-color: var(--accent); color: var(--accent); }
+
+    :root[data-theme="light"] .header-app-logo {
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(240, 246, 255, 0.98));
+      border-color: rgba(216, 226, 240, 0.98);
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.08);
+    }
+    :root[data-theme="light"] .header-app-logo img {
+      background: rgba(24,33,47,0.02);
+    }
+    :root[data-theme="light"] header,
+    :root[data-theme="light"] .content-toolbar,
+    :root[data-theme="light"] #sidebar {
+      box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset;
+    }
+    :root[data-theme="light"] header {
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(246,249,253,1));
+    }
+    :root[data-theme="light"] #sidebar {
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(248,250,253,1));
+    }
+    :root[data-theme="light"] .content-toolbar {
+      background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(244,247,252,0.96));
+    }
+    :root[data-theme="light"] .theme-toggle {
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(237,243,251,1));
+      box-shadow: 0 1px 0 rgba(255,255,255,0.95) inset;
+    }
+    :root[data-theme="light"] .theme-toggle-switch {
+      background: #c8d7ec;
+    }
+    :root[data-theme="light"] .btn-secondary:not(:disabled):hover,
+    :root[data-theme="light"] .btn-ghost:not(:disabled):hover,
+    :root[data-theme="light"] .tree-node:hover,
+    :root[data-theme="light"] .tree-action-btn:hover {
+      background: #e8f0fb;
+      color: var(--text);
+    }
+    :root[data-theme="light"] .btn-secondary {
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(237,243,251,1));
+      box-shadow: 0 1px 0 rgba(255,255,255,0.95) inset;
+    }
+    :root[data-theme="light"] .btn-primary {
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.18);
+    }
+    :root[data-theme="light"] .sidebar-pane-header {
+      border-bottom: 1px solid rgba(215, 222, 232, 0.8);
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(241,246,253,0.98));
+    }
+    :root[data-theme="light"] .sidebar-search input,
+    :root[data-theme="light"] .form-input,
+    :root[data-theme="light"] .form-select {
+      background: rgba(255,255,255,0.92);
+      box-shadow: 0 1px 0 rgba(255,255,255,0.9) inset;
+    }
+    :root[data-theme="light"] .tree-node.active {
+      background: linear-gradient(180deg, rgba(223,234,254,1), rgba(214,228,255,1));
+      box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.12);
+    }
+    :root[data-theme="light"] .modal,
+    :root[data-theme="light"] .toast {
+      background: linear-gradient(180deg, rgba(255,255,255,1), rgba(248,250,253,1));
+    }
+    :root[data-theme="light"] .toast {
+      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- ── Header ──────────────────────────────────────────────────────── -->
+  <header>
+    <div class="header-app">
+      <div id="app-logo" class="header-app-logo" aria-hidden="true"></div>
+      <div class="header-app-copy">
+        <div class="header-app-kicker">Test Manager</div>
+        <div id="app-badge" class="header-app-title is-loading">Loading…</div>
+      </div>
+    </div>
+    <div class="header-spacer"></div>
+    <div class="header-actions">
+      <label class="theme-toggle" title="Toggle dark or light mode">
+        <span class="theme-toggle-label" id="theme-label">Dark</span>
+        <input id="theme-toggle" type="checkbox" aria-label="Toggle light mode" onchange="toggleTheme()" />
+        <span class="theme-toggle-switch" aria-hidden="true"></span>
+      </label>
+      <button id="btn-collect" class="btn btn-secondary" onclick="collectTests()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
+        </svg>
+        Collect Tests
+      </button>
+      <button class="btn btn-ghost btn-icon" title="Refresh" onclick="loadState()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ── Main split ──────────────────────────────────────────────────── -->
+  <div id="main">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-search">
+        <input id="search-input" type="text" placeholder="Filter tests…" oninput="handleSearch(this.value)" />
+      </div>
+      <div class="sidebar-panels">
+        <section id="test-cases-pane" class="sidebar-pane">
+          <div class="sidebar-pane-header">
+            <div class="sidebar-pane-header-main">
+              <span class="sidebar-pane-header-title">Test Cases</span>
+              <span id="test-cases-count" class="tree-count">0</span>
+            </div>
+            <div class="section-header-actions">
+              <button class="btn btn-ghost btn-icon" title="New Folder" onclick="showCreateFolderModal(null)" style="padding:2px 5px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>
+                </svg>
+              </button>
+              <button id="btn-collect-pane" class="btn btn-ghost btn-icon" title="Collect Tests" onclick="collectTests()" style="padding:2px 5px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="test-cases-tree" class="sidebar-pane-body"></div>
+        </section>
+        <div id="pane-resizer" class="resize-handle horizontal" aria-hidden="true"></div>
+        <section id="test-plans-pane" class="sidebar-pane">
+          <div class="sidebar-pane-header">
+            <div class="sidebar-pane-header-main">
+              <span class="sidebar-pane-header-title">Test Plans</span>
+              <span id="test-plans-count" class="tree-count">0</span>
+            </div>
+            <div class="section-header-actions">
+              <button class="btn btn-ghost btn-icon" title="New Plan" onclick="openModal('plan')" style="padding:2px 5px;">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div id="test-plans-tree" class="sidebar-pane-body"></div>
+        </section>
+      </div>
+    </div>
+    <div id="sidebar-resizer" class="resize-handle vertical" aria-hidden="true"></div>
+
+    <!-- Content -->
+    <div id="content">
+      <div class="content-toolbar">
+        <div class="breadcrumb" id="breadcrumb">
+          <span class="breadcrumb-item active">Select a test case group or test plan</span>
+        </div>
+        <div id="content-actions"></div>
+      </div>
+      <div id="run-progress" class="run-progress hidden"></div>
+      <div class="content-scroll" id="content-panel">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+          </svg>
+          <h3>Drumr Test Manager</h3>
+          <p>Select a test case group or cycle from the sidebar, or collect tests to get started.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Loading overlay ────────────────────────────────────────────────── -->
+<div id="loading-overlay" class="loading-overlay hidden">
+  <div class="spinner"></div>
+  <span id="loading-text">Loading…</span>
+</div>
+
+<!-- ── Modal container ────────────────────────────────────────────────── -->
+<div id="modal-container"></div>
+
+<!-- ── Toast container ────────────────────────────────────────────────── -->
+<div id="toast-container"></div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+let S = {
+  appName: '',
+  appLogoUrl: '',
+  plans: [],        // TestPlan[]
+  caseFolders: [],  // {id, name, parentId, testRefs}[] – user-defined folder tree
+  collectedTests: [], // CollectedTest[]
+  caseSelection: {},
+  multiSelectTests: new Set(), // testRefs of collected tests selected for batch operations
+  activeRun: null,
+  activeRunLog: '',
+  runPollTimer: null,
+  selected: null,   // {type: 'plan'|'cycle'|'collected-root'|'collected-type', id: string}
+  expanded: new Set(),
+  searchQ: '',
+  sidebarWidth: 320,
+  paneSizes: {
+    cases: 0.58,
+    plans: 0.42,
+  },
+  theme: 'dark',
+};
+
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 640;
+const SIDEBAR_PANE_MIN_HEIGHT = 140;
+const THEME_STORAGE_KEY = 'drumr-test-manager-theme';
+
+function getPreferredTheme() {
+  const storedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+  if (storedTheme === 'light' || storedTheme === 'dark') return storedTheme;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+}
+
+function applyTheme(theme) {
+  const root = document.documentElement;
+  const toggle = document.getElementById('theme-toggle');
+  const label = document.getElementById('theme-label');
+  const nextTheme = theme === 'light' ? 'light' : 'dark';
+  S.theme = nextTheme;
+  root.dataset.theme = nextTheme;
+  if (toggle) toggle.checked = nextTheme === 'light';
+  if (label) label.textContent = nextTheme === 'light' ? 'Light' : 'Dark';
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
+  window.localStorage.setItem(THEME_STORAGE_KEY, S.theme);
+}
+
+function toggleTheme() {
+  setTheme(S.theme === 'light' ? 'dark' : 'light');
+}
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body !== undefined) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
+  return r.json();
+}
+
+async function loadState() {
+  showLoading('Loading…');
+  try {
+    const data = await api('GET', '/api/state');
+    S.expanded = new Set();
+    S.caseSelection = {};
+    S.multiSelectTests.clear();
+    S.appName = data.appName || '';
+    S.appLogoUrl = data.appLogoUrl || '';
+    S.plans = data.plans || [];
+    S.caseFolders = data.caseFolders || [];
+    S.collectedTests = data.collectedTests || [];
+    S.activeRun = data.activeRun || null;
+    S.activeRunLog = data.activeRunLogTail || '';
+    if (S.activeRun) applyRunStatuses(S.activeRun);
+    updateAppHeader();
+    // Auto-expand top-level plans
+    S.plans.forEach(p => S.expanded.add('plan-' + p.id));
+    S.expanded.add('collected-root');
+    S.expanded.add('tc-uncategorized');
+    render();
+    renderRunProgress();
+    syncRunPolling();
+  } catch(e) {
+    showToast('Failed to load: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+function updateAppHeader() {
+  const titleEl = document.getElementById('app-badge');
+  const logoEl = document.getElementById('app-logo');
+  titleEl.textContent = S.appName || 'Unknown application';
+  titleEl.classList.toggle('is-loading', !S.appName);
+
+  if (S.appLogoUrl) {
+    logoEl.innerHTML = `<img src="${escAttr(S.appLogoUrl)}" alt="${escAttr(S.appName || 'Application')} logo" />`;
+    logoEl.classList.add('visible');
+  } else {
+    logoEl.innerHTML = '';
+    logoEl.classList.remove('visible');
+  }
+}
+
+async function collectTests() {
+  const btn = document.getElementById('btn-collect');
+  const paneBtn = document.getElementById('btn-collect-pane');
+  btn.disabled = true;
+  if (paneBtn) paneBtn.disabled = true;
+  showLoading('Collecting tests…');
+  try {
+    const data = await api('POST', '/api/collect');
+    S.collectedTests = data.collectedTests || [];
+    S.multiSelectTests.clear();
+    await saveTestPlans();
+    S.expanded.add('collected-root');
+    renderSidebar();
+    // If viewing collected, refresh content too
+    if (S.selected && (S.selected.type === 'collected-root' || S.selected.type === 'collected-type')) {
+      renderContent();
+    }
+    showToast(`Collected ${S.collectedTests.length} tests`, 'success');
+  } catch(e) {
+    showToast('Collect failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    if (paneBtn) paneBtn.disabled = false;
+    hideLoading();
+  }
+}
+
+async function saveTestPlans() {
+  try {
+    await api('PUT', '/api/test-plans', {
+      plans: S.plans,
+      caseFolders: S.caseFolders,
+      collectedTests: S.collectedTests,
+    });
+  } catch(e) {
+    showToast('Save failed: ' + e.message, 'error');
+    throw e;
+  }
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function render() { renderSidebar(); renderContent(); renderRunProgress(); }
+
+function renderRunProgress() {
+  const el = document.getElementById('run-progress');
+  if (!el) return;
+
+  if (!S.activeRun) {
+    el.classList.add('hidden');
+    el.innerHTML = '';
+    return;
+  }
+
+  const progress = S.activeRun.progress || { total: 0, completed: 0, passed: 0, failed: 0, skipped: 0, pending: 0, percent: 0 };
+  const lifecycleLabel = {
+    queued: 'Queued',
+    running: 'Running',
+    completed: 'Completed',
+    failed: 'Failed',
+  }[S.activeRun.lifecycle] || S.activeRun.lifecycle;
+
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <div class="run-progress-header">
+      <div class="run-progress-title">
+        ${iconPlay(12)}
+        <span>${esc(S.activeRun.label || 'Background test run')}</span>
+      </div>
+      <div class="run-progress-state">${esc(lifecycleLabel)}</div>
+    </div>
+    <div class="run-progress-track">
+      <div class="run-progress-fill" style="width:${Number(progress.percent || 0)}%"></div>
+    </div>
+    <div class="run-progress-meta">
+      <span>${Number(progress.percent || 0)}% complete · ${Number(progress.completed || 0)}/${Number(progress.total || 0)} finished</span>
+      <div class="run-progress-stats">
+        <span class="run-progress-stat"><strong>${Number(progress.passed || 0)}</strong> passed</span>
+        <span class="run-progress-stat"><strong>${Number(progress.failed || 0)}</strong> failed</span>
+        <span class="run-progress-stat"><strong>${Number(progress.skipped || 0)}</strong> skipped</span>
+        <span class="run-progress-stat"><strong>${Number(progress.pending || 0)}</strong> pending</span>
+      </div>
+    </div>
+    <details class="run-log" ${S.activeRunLog ? 'open' : ''}>
+      <summary>Execution log</summary>
+      <pre>${esc(S.activeRunLog || 'Waiting for execution log...')}</pre>
+    </details>`;
+}
+
+function renderSidebar() {
+  const q = S.searchQ.toLowerCase();
+  const testCasesEl = document.getElementById('test-cases-tree');
+  const testPlansEl = document.getElementById('test-plans-tree');
+  const testCasesPane = document.getElementById('test-cases-pane');
+  const testPlansPane = document.getElementById('test-plans-pane');
+  document.getElementById('test-cases-count').textContent = String(S.collectedTests.length);
+  document.getElementById('test-plans-count').textContent = String(S.plans.length);
+  applySidebarLayout();
+
+  let testCasesHtml = '';
+  let testPlansHtml = '';
+
+  // ── Build test-ref → folderId lookup ─────────────────────────────────
+  const refToFolder = {};
+  for (const f of S.caseFolders) {
+    for (const ref of (f.testRefs || [])) refToFolder[ref] = f.id;
+  }
+  const unassigned = S.collectedTests.filter(t => !refToFolder[tcRef(t)]);
+
+  // ── Render user-defined folder tree (root folders) ───────────────────
+  for (const folder of buildFolderTree(null)) {
+    testCasesHtml += renderFolderNode(folder, 0);
+  }
+
+  // ── Render uncategorized section ─────────────────────────────────────
+  testCasesHtml += renderUncategorizedSection(unassigned, q);
+
+  const filteredPlans = q
+    ? S.plans.filter(p => p.name.toLowerCase().includes(q) || p.cycles.some(c =>
+        c.name.toLowerCase().includes(q) || c.cases.some(t => t.name.toLowerCase().includes(q))))
+    : S.plans;
+
+  if (filteredPlans.length === 0) {
+    testPlansHtml += `<div class="pane-empty-state">No test plans yet. Click + to create one.</div>`;
+  }
+
+  for (const plan of filteredPlans) {
+    const planKey = 'plan-' + plan.id;
+    const isOpen = S.expanded.has(planKey);
+    const isActive = S.selected?.id === plan.id && S.selected?.type === 'plan';
+    const totalCases = plan.cycles.reduce((s, c) => s + c.cases.length, 0);
+
+    testPlansHtml += `
+      <div class="tree-node ${isActive ? 'active' : ''}" onclick="selectNode('plan','${escJsAttr(plan.id)}',event)" style="padding:2px 4px 2px 4px;">
+        <div class="tree-indent"></div>
+        <div class="tree-arrow ${isOpen ? 'open' : ''}" onclick="toggleExpand('${escJsAttr(planKey)}',event)">${iconChevron()}</div>
+        <div class="tree-icon">${iconFolder(isOpen)}</div>
+        <div class="tree-label"><strong>${esc(plan.name)}</strong></div>
+        <div class="tree-count">${totalCases}</div>
+        <div class="tree-actions">
+          <button class="tree-action-btn" title="Add Cycle" onclick="openModal('cycle','${escJsAttr(plan.id)}',event)">${iconPlus(11)}</button>
+          <button class="tree-action-btn" title="Delete Plan" onclick="deletePlan('${escJsAttr(plan.id)}',event)">${iconTrash()}</button>
+        </div>
+      </div>`;
+
+    if (isOpen) {
+      const filteredCycles = q
+        ? plan.cycles.filter(c => c.name.toLowerCase().includes(q) || c.cases.some(t => t.name.toLowerCase().includes(q)))
+        : plan.cycles;
+
+      if (filteredCycles.length === 0 && !q) {
+        testPlansHtml += `<div style="padding:4px 4px 4px 44px;font-size:11px;color:var(--text-muted);">No cycles yet.</div>`;
+      }
+
+      for (const cycle of filteredCycles) {
+        const cycleKey = 'cycle-' + cycle.id;
+        const isOpenC = S.expanded.has(cycleKey);
+        const isActiveC = S.selected?.id === cycle.id && S.selected?.type === 'cycle';
+
+        testPlansHtml += `
+          <div class="tree-node ${isActiveC ? 'active' : ''}" onclick="selectNode('cycle','${escJsAttr(cycle.id)}',event)" style="padding:2px 4px 2px 4px;">
+            <div class="tree-indent"><div class="tree-indent-unit"></div></div>
+            <div class="tree-arrow ${isOpenC ? 'open' : ''}" onclick="toggleExpand('${escJsAttr(cycleKey)}',event)">${iconChevron()}</div>
+            <div class="tree-icon">${iconCycle()}</div>
+            <div class="tree-label"><strong>${esc(cycle.name)}</strong></div>
+            <div class="tree-count">${cycle.cases.length}</div>
+            <div class="tree-actions">
+              <button class="tree-action-btn" title="Delete Cycle" onclick="deleteCycle('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}',event)">${iconTrash()}</button>
+            </div>
+          </div>`;
+
+        if (isOpenC) {
+          for (const tc of cycle.cases) {
+            const isActiveT = S.selected?.id === tc.id && S.selected?.type === 'case';
+            const dot = `<div class="tc-status-dot ${tc.status||'pending'}" style="width:7px;height:7px;margin-top:0;"></div>`;
+            testPlansHtml += `
+              <div class="tree-node ${isActiveT ? 'active' : ''}" style="padding:2px 4px 2px 4px;">
+                <div class="tree-indent"><div class="tree-indent-unit"></div><div class="tree-indent-unit"></div></div>
+                <div style="width:16px;flex-shrink:0;"></div>
+                <div class="tree-icon" style="margin-right:5px;">${dot}</div>
+                <div class="tree-label" style="font-size:11.5px;">${esc(tc.name)}</div>
+              </div>`;
+          }
+        }
+      }
+    }
+  }
+
+  testCasesEl.innerHTML = testCasesHtml || `<div class="pane-empty-state">No test cases collected yet.</div>`;
+  testPlansEl.innerHTML = testPlansHtml;
+  testCasesPane.classList.toggle('empty', S.collectedTests.length === 0);
+  testPlansPane.classList.toggle('empty', filteredPlans.length === 0);
+}
+
+function renderContent() {
+  const panel = document.getElementById('content-panel');
+  const bc    = document.getElementById('breadcrumb');
+  const ca    = document.getElementById('content-actions');
+  ca.innerHTML = '';
+
+  if (!S.selected) {
+    bc.innerHTML = `<span class="breadcrumb-item active">Select a test case group or test plan</span>`;
+    panel.innerHTML = emptyState('Drumr Test Manager', 'Select a test case group or cycle from the sidebar, or click Collect Tests to discover spec files.');
+    return;
+  }
+
+  const { type, id } = S.selected;
+
+  if (type === 'plan') {
+    const plan = S.plans.find(p => p.id === id);
+    if (!plan) return;
+    const totalCases = getPlanCases(plan.id).length;
+    const selectedCount = getSelectedCasesForPlan(plan.id).length;
+    bc.innerHTML = breadcrumb([plan.name]);
+    ca.innerHTML = `
+      <button class="btn btn-ghost" onclick="setPlanSelection('${escJsAttr(plan.id)}',true)">
+        Select all
+      </button>
+      <button class="btn btn-ghost" onclick="clearPlanSelection('${escJsAttr(plan.id)}')">
+        Clear
+      </button>
+      <button class="btn btn-primary" ${selectedCount === 0 ? 'disabled' : ''} onclick="runSelectedPlanTests('${escJsAttr(plan.id)}')">
+        ${iconPlay(12)} Run ${selectedCount}/${totalCases} in Background
+      </button>
+      <button class="btn btn-secondary" onclick="openModal('cycle','${escJsAttr(plan.id)}')">
+        ${iconPlus(12)} Add Cycle
+      </button>`;
+    renderPlanContent(panel, plan);
+    return;
+  }
+
+  if (type === 'cycle') {
+    const { plan, cycle } = findCycle(id);
+    if (!plan || !cycle) return;
+    const totalCases = getCycleCases(plan.id, cycle.id).length;
+    const selectedCount = getSelectedCasesForCycle(plan.id, cycle.id).length;
+    bc.innerHTML = breadcrumb([plan.name, cycle.name]);
+    ca.innerHTML = `
+      <button class="btn btn-ghost" onclick="setCycleSelection('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}',true)">
+        Select all
+      </button>
+      <button class="btn btn-ghost" onclick="clearCycleSelection('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}')">
+        Clear
+      </button>
+      <button class="btn btn-primary" ${selectedCount === 0 ? 'disabled' : ''} onclick="runSelectedCycleTests('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}')">
+        ${iconPlay(12)} Run ${selectedCount}/${totalCases} in Background
+      </button>
+      <button class="btn btn-secondary" onclick="openAddCaseModal('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}')">
+        ${iconPlus(12)} Add Case
+      </button>`;
+    renderCycleContent(panel, plan, cycle);
+    return;
+  }
+
+  if (type === 'collected-root') {
+    bc.innerHTML = breadcrumb(['Test Cases']);
+    renderCollectedContent(panel, S.collectedTests);
+    return;
+  }
+
+  if (type === 'collected-type') {
+    const typeMap = { unit: 'Unit Tests', int: 'Integration Tests', e2e: 'E2E Tests' };
+    bc.innerHTML = breadcrumb(['Test Cases', typeMap[id] || id]);
+    renderCollectedContent(panel, S.collectedTests.filter(t => t.type === id));
+    return;
+  }
+
+  if (type === 'tc-folder') {
+    const folder = S.caseFolders.find(f => f.id === id);
+    if (!folder) return;
+    const pathParts = [];
+    let cur = folder;
+    while (cur) {
+      pathParts.unshift(cur.name);
+      cur = cur.parentId ? S.caseFolders.find(f => f.id === cur.parentId) : null;
+    }
+    bc.innerHTML = breadcrumb(['Test Cases', ...pathParts]);
+    const tests = (folder.testRefs || [])
+      .map(ref => S.collectedTests.find(t => tcRef(t) === ref))
+      .filter(Boolean);
+    renderCollectedContent(panel, tests);
+    return;
+  }
+}
+
+function renderPlanContent(el, plan) {
+  if (plan.cycles.length === 0) {
+    el.innerHTML = emptyState('No cycles yet', 'Create a cycle to organise test cases within this plan.');
+    return;
+  }
+  let html = '';
+  for (const cycle of plan.cycles) {
+    html += `
+      <div style="margin-bottom:24px;">
+        <div class="plan-section-title">
+          ${iconCycleInline()} ${esc(cycle.name)}
+          <span class="count-badge">${cycle.cases.length} case${cycle.cases.length!==1?'s':''}</span>
+          <button class="btn btn-ghost" style="margin-left:auto;padding:2px 8px;font-size:11px;" onclick="selectNode('cycle','${escJsAttr(cycle.id)}',{stopPropagation:()=>{}})">View →</button>
+        </div>
+        <div class="tc-grid">`;
+    if (cycle.cases.length === 0) {
+      html += `<div style="color:var(--text-muted);font-size:12px;padding:8px 0;">No cases in this cycle.</div>`;
+    }
+    for (const tc of cycle.cases) {
+      html += tcCard(tc, plan.id, cycle.id);
+    }
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function renderCycleContent(el, plan, cycle) {
+  let html = `<div class="tc-grid">`;
+  if (cycle.cases.length === 0) {
+    el.innerHTML = emptyState('No test cases', 'Add cases from the Test Cases panel or click "Add Case".');
+    return;
+  }
+  for (const tc of cycle.cases) {
+    html += tcCard(tc, plan.id, cycle.id);
+  }
+  html += `</div>
+    <div class="add-case-zone" onclick="openAddCaseModal('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}')">
+      + Add test case from test cases
+    </div>`;
+  el.innerHTML = html;
+}
+
+function renderCollectedContent(el, tests) {
+  if (tests.length === 0) {
+    el.innerHTML = emptyState('No tests collected', 'Click "Collect Tests" in the toolbar to scan the project for spec files.');
+    return;
+  }
+  // Group by spec file
+  const groups = {};
+  for (const t of tests) {
+    if (!groups[t.specFile]) groups[t.specFile] = [];
+    groups[t.specFile].push(t);
+  }
+  
+  const selectedCount = S.multiSelectTests.size;
+  let html = '';
+  
+  // Show toolbar if any tests are selected
+  if (selectedCount > 0) {
+    html += `
+      <div class="multiselect-toolbar">
+        <div class="multiselect-info">${selectedCount} test case${selectedCount !== 1 ? 's' : ''} selected</div>
+        <div class="multiselect-actions">
+          <button class="btn btn-secondary" onclick="clearMultiSelect()">Clear</button>
+          <button class="btn btn-primary" onclick="showMoveToFolderModal(event)">
+            ${iconMove(12)} Move to Folder
+          </button>
+        </div>
+      </div>`;
+  }
+  
+  for (const [file, items] of Object.entries(groups)) {
+    const fileSpecRefs = items.map(t => tcRef(t));
+    const isFileFullySelected = isSpecFileFullySelected(fileSpecRefs);
+    html += `
+      <div style="margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);font-family:monospace;padding:6px 0 6px 0;border-bottom:1px solid var(--border);margin-bottom:6px;word-break:break-all;display:flex;align-items:center;gap:8px;">
+          <input type="checkbox" ${isFileFullySelected ? 'checked' : ''} onchange="toggleSpecFileSelection('${escJsAttr(file)}', this.checked)" style="flex-shrink:0;" />
+          ${esc(file)}
+        </div>
+        <div style="display:flex;flex-direction:column;gap:3px;">`;
+    for (const t of items) {
+      const ref = tcRef(t);
+      const isSelected = S.multiSelectTests.has(ref);
+      const testPayload = esc(encodeURIComponent(JSON.stringify(t)));
+      html += `
+        <div class="ct-item ${isSelected ? 'selected' : ''}" style="padding:6px 8px;border-radius:4px;">
+          <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleMultiSelect('${escJsAttr(ref)}', this.checked)" />
+          <div class="ct-type-dot ${t.type}" style="width:8px;height:8px;flex-shrink:0;"></div>
+          <div class="ct-name" style="font-size:12px;flex:1;" title="${esc(t.displayName)}">${esc(t.displayName)}</div>
+          <button class="ct-add-btn" data-test="${testPayload}" onclick="openAddToPlanModal(event)">+ Add to Plan</button>
+        </div>`;
+    }
+    html += `</div></div>`;
+  }
+  el.innerHTML = html;
+}
+
+function tcCard(tc, planId, cycleId) {
+  const status = tc.status || 'pending';
+  const selectionKey = getCaseSelectionKey(planId, cycleId, tc.id);
+  const checked = Boolean(S.caseSelection[selectionKey]);
+  const typeBadge = tc.specFile
+    ? `<span class="tc-type-badge ${classifySpec(tc.specFile)}">${classifySpec(tc.specFile)}</span>`
+    : '';
+  return `
+    <div class="tc-card">
+      <label style="display:flex;align-items:center;justify-content:center;padding-right:2px;">
+        <input
+          type="checkbox"
+          aria-label="Select ${escAttr(tc.name)}"
+          ${checked ? 'checked' : ''}
+          onclick="event.stopPropagation()"
+          onchange="toggleCaseSelection('${escJsAttr(planId)}','${escJsAttr(cycleId)}','${escJsAttr(tc.id)}',this.checked)"
+        />
+      </label>
+      <div class="tc-status-dot ${status}"></div>
+      <div class="tc-body">
+        <div class="tc-title">${esc(tc.name)}</div>
+        <div class="tc-meta">
+          <span class="tc-id">${esc(tc.id||'')}</span>
+          ${tc.specFile ? `<span class="tc-spec">${esc(tc.specFile.split('/').pop()||'')}</span>` : ''}
+          ${typeBadge}
+        </div>
+      </div>
+      <div class="tc-actions">
+        <select class="form-select" style="font-size:11px;padding:3px 6px;" onchange="updateCaseStatus('${escJsAttr(planId)}','${escJsAttr(cycleId)}','${escJsAttr(tc.id)}',this.value)">
+          ${['pending','passed','failed','skipped'].map(s => `<option value="${s}" ${s===status?'selected':''}>${s.charAt(0).toUpperCase()+s.slice(1)}</option>`).join('')}
+        </select>
+        <button class="btn btn-ghost btn-icon" title="Remove" onclick="removeCase('${escJsAttr(planId)}','${escJsAttr(cycleId)}','${escJsAttr(tc.id)}')">
+          ${iconTrash()}
+        </button>
+      </div>
+    </div>`;
+}
+
+// ─── Selection & Expand ───────────────────────────────────────────────────────
+function selectNode(type, id, event) {
+  event?.stopPropagation?.();
+  S.selected = { type, id };
+  renderSidebar();
+  renderContent();
+}
+
+function toggleExpand(key, event) {
+  event?.stopPropagation?.();
+  if (S.expanded.has(key)) S.expanded.delete(key);
+  else S.expanded.add(key);
+  renderSidebar();
+}
+
+function handleSearch(q) {
+  S.searchQ = q;
+  renderSidebar();
+}
+
+function applySidebarLayout() {
+  const sidebar = document.getElementById('sidebar');
+  const casesPane = document.getElementById('test-cases-pane');
+  const plansPane = document.getElementById('test-plans-pane');
+  if (!sidebar || !casesPane || !plansPane) return;
+  sidebar.style.width = `${clamp(S.sidebarWidth, SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH)}px`;
+  const totalRatio = S.paneSizes.cases + S.paneSizes.plans || 1;
+  const casesRatio = S.paneSizes.cases / totalRatio;
+  const plansRatio = S.paneSizes.plans / totalRatio;
+  casesPane.style.flex = `${casesRatio} 1 0px`;
+  plansPane.style.flex = `${plansRatio} 1 0px`;
+}
+
+function setupLayoutResizers() {
+  const sidebar = document.getElementById('sidebar');
+  const sidebarResizer = document.getElementById('sidebar-resizer');
+  const paneResizer = document.getElementById('pane-resizer');
+  const panels = document.querySelector('.sidebar-panels');
+  if (!sidebar || !sidebarResizer || !paneResizer || !panels) return;
+
+  sidebarResizer.addEventListener('mousedown', event => {
+    event.preventDefault();
+    sidebarResizer.classList.add('is-dragging');
+    const startX = event.clientX;
+    const startWidth = sidebar.getBoundingClientRect().width;
+    const onMove = moveEvent => {
+      S.sidebarWidth = clamp(startWidth + (moveEvent.clientX - startX), SIDEBAR_MIN_WIDTH, SIDEBAR_MAX_WIDTH);
+      applySidebarLayout();
+    };
+    const onUp = () => {
+      sidebarResizer.classList.remove('is-dragging');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  paneResizer.addEventListener('mousedown', event => {
+    event.preventDefault();
+    paneResizer.classList.add('is-dragging');
+    const panelsRect = panels.getBoundingClientRect();
+    const handleHeight = paneResizer.getBoundingClientRect().height;
+    const totalHeight = panelsRect.height - handleHeight;
+    const onMove = moveEvent => {
+      const nextCasesHeight = clamp(
+        moveEvent.clientY - panelsRect.top,
+        SIDEBAR_PANE_MIN_HEIGHT,
+        totalHeight - SIDEBAR_PANE_MIN_HEIGHT,
+      );
+      const remaining = Math.max(totalHeight - nextCasesHeight, SIDEBAR_PANE_MIN_HEIGHT);
+      S.paneSizes.cases = nextCasesHeight;
+      S.paneSizes.plans = remaining;
+      applySidebarLayout();
+    };
+    const onUp = () => {
+      paneResizer.classList.remove('is-dragging');
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  });
+
+  window.addEventListener('resize', applySidebarLayout);
+  applySidebarLayout();
+}
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+// ─── Test Case Folder helpers ─────────────────────────────────────────────────
+
+/** Stable key identifying a collected test across re-collects. */
+function tcRef(t) {
+  return `${t.specFile}::${t.describeName || ''}::${t.testName}`;
+}
+
+/** Build a recursive tree from the flat caseFolders array for a given parentId. */
+function buildFolderTree(parentId) {
+  return S.caseFolders
+    .filter(f => (f.parentId ?? null) === parentId)
+    .map(f => ({
+      ...f,
+      children: buildFolderTree(f.id),
+      tests: (f.testRefs || []).map(ref => S.collectedTests.find(t => tcRef(t) === ref)).filter(Boolean),
+    }));
+}
+
+function countFolderTests(folder) {
+  const direct = (folder.tests || []).length;
+  return direct + (folder.children || []).reduce((s, c) => s + countFolderTests(c), 0);
+}
+
+function renderFolderNode(folder, depth) {
+  const key = 'folder-' + folder.id;
+  const isOpen = S.expanded.has(key);
+  const total = countFolderTests(folder);
+  const indent = depth > 0 ? `<div class="tree-indent-unit"></div>`.repeat(depth) : '';
+  const isActive = S.selected?.id === folder.id && S.selected?.type === 'tc-folder';
+
+  let html = `
+        <div class="tree-node ${isActive ? 'active' : ''}"
+          data-folder-id="${escAttr(folder.id)}"
+          ondragover="onDragOver(event,'${escJsAttr(folder.id)}')"
+          ondragleave="onDragLeave(event,'${escJsAttr(folder.id)}')"
+          ondrop="onDrop(event,'${escJsAttr(folder.id)}')"
+          onclick="selectNode('tc-folder','${escJsAttr(folder.id)}',event)"
+         style="padding:2px 4px;">
+      <div class="tree-indent">${indent}</div>
+      <div class="tree-arrow ${isOpen ? 'open' : ''}" onclick="toggleExpand('${escJsAttr(key)}',event)">${iconChevron()}</div>
+      <div class="tree-icon">${iconFolder(isOpen)}</div>
+      <div class="tree-label"><strong>${esc(folder.name)}</strong></div>
+      <div class="tree-count">${total}</div>
+      <div class="tree-actions">
+        <button class="tree-action-btn" title="Add Sub-folder" onclick="showCreateFolderModal('${escJsAttr(folder.id)}',event)">${iconPlus(11)}</button>
+        <button class="tree-action-btn" title="Delete Folder" onclick="deleteFolder('${escJsAttr(folder.id)}',event)">${iconTrash()}</button>
+      </div>
+    </div>`;
+
+  if (isOpen) {
+    for (const t of (folder.tests || [])) {
+      html += renderDraggableTest(t, folder.id, depth + 1);
+    }
+    for (const child of (folder.children || [])) {
+      html += renderFolderNode(child, depth + 1);
+    }
+    if ((folder.tests || []).length === 0 && (folder.children || []).length === 0) {
+      html += `<div class="folder-drop-hint" style="padding-left:${(depth + 2) * 16 + 8}px;">Drop test cases here</div>`;
+    }
+  }
+  return html;
+}
+
+function renderDraggableTest(t, sourceFolderId, depth) {
+  const ref = tcRef(t);
+  const pl = depth * 16 + 8;
+  return `
+    <div class="ct-item tc-draggable"
+         draggable="true"
+         data-test-ref="${esc(ref)}"
+         data-source-folder="${esc(sourceFolderId)}"
+         ondragstart="onDragStart(event)"
+         ondragend="onDragEnd(event)"
+         style="padding:3px 8px 3px ${pl}px;">
+      <span class="drag-handle">⠿</span>
+      <div class="ct-type-dot ${t.type}"></div>
+      <div class="ct-name" title="${esc(t.displayName)}">${esc(t.displayName)}</div>
+    </div>`;
+}
+
+function renderUncategorizedSection(tests, q) {
+  const key = 'tc-uncategorized';
+  const isOpen = S.expanded.has(key);
+  const isActive = S.selected?.type === 'collected-root';
+  const filtered = q ? tests.filter(t => t.displayName.toLowerCase().includes(q)) : tests;
+  if (S.caseFolders.length === 0 && tests.length === 0) {
+    return `<div class="pane-empty-state">No test cases collected yet.<br/>Click + to add folders.</div>`;
+  }
+  if (filtered.length === 0 && S.caseFolders.length > 0) return '';
+
+  const unitTests = filtered.filter(t => t.type === 'unit');
+  const intTests  = filtered.filter(t => t.type === 'int');
+  const e2eTests  = filtered.filter(t => t.type === 'e2e');
+
+  let html = `
+    <div class="tree-node ${isActive ? 'active' : ''}"
+         data-folder-id="uncategorized"
+         ondragover="onDragOver(event,'uncategorized')"
+         ondragleave="onDragLeave(event,'uncategorized')"
+         ondrop="onDrop(event,'uncategorized')"
+         onclick="selectNode('collected-root','collected',event)"
+         style="padding:2px 4px;margin-top:2px;">
+      <div class="tree-indent"></div>
+      <div class="tree-arrow ${isOpen ? 'open' : ''}" onclick="toggleExpand('${escJsAttr(key)}',event)">${iconChevron()}</div>
+      <div class="tree-icon">${iconBeaker()}</div>
+      <div class="tree-label"><strong>Uncategorized</strong></div>
+      <div class="tree-count">${tests.length}</div>
+    </div>`;
+
+  if (isOpen) {
+    for (const [typeKey, label, color, list] of [
+      ['unit', 'Unit', 'var(--unit-color)', unitTests],
+      ['int',  'Integration', 'var(--int-color)', intTests],
+      ['e2e',  'E2E', 'var(--e2e-color)', e2eTests],
+    ]) {
+      if (list.length === 0) continue;
+      const tKey = 'ctype-' + typeKey;
+      const isOpenT = S.expanded.has(tKey);
+      const isActiveT = S.selected?.id === typeKey && S.selected?.type === 'collected-type';
+      html += `
+        <div class="tree-node ${isActiveT ? 'active' : ''}" onclick="selectNode('collected-type','${escJsAttr(typeKey)}',event)" style="padding:2px 4px;">
+          <div class="tree-indent"><div class="tree-indent-unit"></div></div>
+          <div class="tree-arrow ${isOpenT ? 'open' : ''}" onclick="toggleExpand('${escJsAttr(tKey)}',event)">${iconChevron()}</div>
+          <div class="tree-icon"><div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div></div>
+          <div class="tree-label"><strong>${label}</strong></div>
+          <div class="tree-count">${list.length}</div>
+        </div>`;
+      if (isOpenT) {
+        for (const t of list) html += renderDraggableTest(t, 'uncategorized', 2);
+      }
+    }
+  }
+  return html;
+}
+
+// ─── Folder CRUD ──────────────────────────────────────────────────────────────
+
+function showCreateFolderModal(parentId, event) {
+  event?.stopPropagation?.();
+  const parent = parentId ? S.caseFolders.find(f => f.id === parentId) : null;
+  const title = parent ? `New Sub-folder in "${esc(parent.name)}"` : 'New Folder';
+  const html = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>${title}</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Folder Name</label>
+            <input id="modal-name" class="form-input" placeholder="e.g. Authentication" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="createFolder('${escJsAttr(parentId || '')}')">Create</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-container').innerHTML = html;
+  setTimeout(() => document.getElementById('modal-name')?.focus(), 50);
+}
+
+function createFolder(parentId) {
+  const name = document.getElementById('modal-name')?.value?.trim();
+  if (!name) { showToast('Please enter a folder name.', 'error'); return; }
+  const id = nextId('CF', S.caseFolders);
+  S.caseFolders.push({ id, name, parentId: parentId || null, testRefs: [] });
+  S.expanded.add('folder-' + id);
+  saveTestPlans();
+  closeModal();
+  renderSidebar();
+  showToast(`Folder "${name}" created`, 'success');
+}
+
+function deleteFolder(folderId, event) {
+  event?.stopPropagation?.();
+  const folder = S.caseFolders.find(f => f.id === folderId);
+  if (!folder) return;
+  const getAllDescendants = (id) => {
+    const direct = S.caseFolders.filter(f => f.parentId === id).map(f => f.id);
+    return [id, ...direct.flatMap(getAllDescendants)];
+  };
+  const toDelete = getAllDescendants(folderId);
+  const totalTests = toDelete.reduce((sum, id) => {
+    const f = S.caseFolders.find(f => f.id === id);
+    return sum + (f?.testRefs?.length || 0);
+  }, 0);
+  const subCount = toDelete.length - 1;
+  const msg = `Delete folder "${folder.name}"${subCount > 0 ? ` and ${subCount} sub-folder(s)` : ''}?`
+    + (totalTests > 0 ? ` ${totalTests} test assignment(s) will move to Uncategorized.` : '');
+  if (!confirm(msg)) return;
+  S.caseFolders = S.caseFolders.filter(f => !toDelete.includes(f.id));
+  if (S.selected?.id === folderId) S.selected = null;
+  saveTestPlans();
+  renderSidebar();
+  showToast('Folder deleted', 'info');
+}
+
+// ─── Multi-select for collected tests ──────────────────────────────────────
+
+function toggleMultiSelect(testRef, checked) {
+  if (checked) {
+    S.multiSelectTests.add(testRef);
+  } else {
+    S.multiSelectTests.delete(testRef);
+  }
+  renderContent();
+}
+
+function clearMultiSelect() {
+  S.multiSelectTests.clear();
+  renderContent();
+}
+
+function isSpecFileFullySelected(specFileRefs) {
+  if (specFileRefs.length === 0) return false;
+  return specFileRefs.every(ref => S.multiSelectTests.has(ref));
+}
+
+function toggleSpecFileSelection(specFile, checked) {
+  // Find all tests in this spec file
+  const testsInFile = S.collectedTests.filter(t => t.specFile === specFile);
+  const specsToToggle = testsInFile.map(t => tcRef(t));
+  
+  if (checked) {
+    // Select all tests in this file
+    for (const ref of specsToToggle) {
+      S.multiSelectTests.add(ref);
+    }
+  } else {
+    // Deselect all tests in this file
+    for (const ref of specsToToggle) {
+      S.multiSelectTests.delete(ref);
+    }
+  }
+  renderContent();
+}
+
+function showMoveToFolderModal(event) {
+  try {
+    event?.stopPropagation?.();
+    if (S.multiSelectTests.size === 0) {
+      showToast('No tests selected.', 'error');
+      return;
+    }
+  } catch (err) {
+    showToast('Could not open Move dialog: ' + (err && err.message ? err.message : String(err)), 'error');
+    return;
+  }
+
+  // Build folder tree HTML
+  let folderOptionsHtml = '<option value="">— Uncategorized —</option>';
+  const renderFolderOptions = (parentId, depth) => {
+    const folders = S.caseFolders.filter(f => (f.parentId ?? null) === parentId);
+    for (const folder of folders) {
+      const indent = '&nbsp;'.repeat(depth * 2);
+      folderOptionsHtml += `<option value="${esc(folder.id)}">${indent}${esc(folder.name)}</option>`;
+      renderFolderOptions(folder.id, depth + 1);
+    }
+  };
+  renderFolderOptions(null, 0);
+
+  const selectedCount = S.multiSelectTests.size;
+  let html = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Move Test Cases</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Tests to Move</label>
+            <div style="font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:160px;overflow-y:auto;">`;
+  
+  // List selected tests
+  for (const ref of Array.from(S.multiSelectTests).sort()) {
+    const test = S.collectedTests.find(t => tcRef(t) === ref);
+    if (test) {
+      html += `<div style="padding:4px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(test.displayName)}</div>`;
+    }
+  }
+
+  const html2 = html + `
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${selectedCount} test case${selectedCount !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Target Folder</label>
+            <select id="modal-target-folder" class="form-select">${folderOptionsHtml}</select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="performMoveTests()">Move ${selectedCount}</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-container').innerHTML = html2;
+  setTimeout(() => document.getElementById('modal-target-folder')?.focus(), 50);
+}
+
+function performMoveTests() {
+  const targetFolderId = document.getElementById('modal-target-folder')?.value;
+  if (targetFolderId === undefined) return;
+
+  const selectedRefs = Array.from(S.multiSelectTests);
+  if (selectedRefs.length === 0) {
+    showToast('No tests selected.', 'error');
+    return;
+  }
+
+  // Remove from all folders first
+  for (const folder of S.caseFolders) {
+    folder.testRefs = (folder.testRefs || []).filter(ref => !selectedRefs.includes(ref));
+  }
+
+  // Add to target folder (if not empty string, which means uncategorized)
+  if (targetFolderId !== '') {
+    const targetFolder = S.caseFolders.find(f => f.id === targetFolderId);
+    if (targetFolder) {
+      if (!targetFolder.testRefs) targetFolder.testRefs = [];
+      for (const ref of selectedRefs) {
+        if (!targetFolder.testRefs.includes(ref)) {
+          targetFolder.testRefs.push(ref);
+        }
+      }
+    }
+  }
+
+  S.multiSelectTests.clear();
+  saveTestPlans();
+  closeModal();
+  renderSidebar();
+  renderContent();
+  showToast(`Moved ${selectedRefs.length} test case${selectedRefs.length !== 1 ? 's' : ''} successfully`, 'success');
+}
+
+// ─── Drag & Drop ──────────────────────────────────────────────────────────────
+
+let _dragState = null;
+
+function onDragStart(event) {
+  _dragState = {
+    testRef: event.currentTarget.dataset.testRef,
+    sourceFolderId: event.currentTarget.dataset.sourceFolder,
+  };
+  event.dataTransfer.effectAllowed = 'move';
+  event.dataTransfer.setData('text/plain', _dragState.testRef || '');
+  setTimeout(() => { if (event.target) event.target.style.opacity = '0.4'; }, 0);
+}
+
+function onDragEnd(event) {
+  if (event.target) event.target.style.opacity = '';
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  _dragState = null;
+}
+
+function onDragOver(event, folderId) {
+  if (!_dragState || folderId === _dragState.sourceFolderId) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.dataTransfer.dropEffect = 'move';
+  if (!event.currentTarget.classList.contains('drag-over')) {
+    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    event.currentTarget.classList.add('drag-over');
+  }
+}
+
+function onDragLeave(event, folderId) {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    event.currentTarget.classList.remove('drag-over');
+  }
+}
+
+function onDrop(event, targetFolderId) {
+  event.preventDefault();
+  event.stopPropagation();
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  if (!_dragState) return;
+  const { testRef, sourceFolderId } = _dragState;
+  _dragState = null;
+  if (sourceFolderId === targetFolderId) return;
+  // Remove from source folder (if it was in one)
+  if (sourceFolderId !== 'uncategorized') {
+    const src = S.caseFolders.find(f => f.id === sourceFolderId);
+    if (src) src.testRefs = (src.testRefs || []).filter(r => r !== testRef);
+  }
+  // Add to target folder (unless dropped back to uncategorized)
+  if (targetFolderId !== 'uncategorized') {
+    const tgt = S.caseFolders.find(f => f.id === targetFolderId);
+    if (tgt) {
+      if (!tgt.testRefs) tgt.testRefs = [];
+      if (!tgt.testRefs.includes(testRef)) tgt.testRefs.push(testRef);
+    }
+  }
+  saveTestPlans();
+  renderSidebar();
+}
+
+// ─── CRUD helpers ─────────────────────────────────────────────────────────────
+function nextId(prefix, items) {
+  const nums = items.map(i => parseInt(i.id.replace(prefix + '-', ''), 10)).filter(n => !isNaN(n));
+  const max  = nums.length ? Math.max(...nums) : 0;
+  return `${prefix}-${String(max + 1).padStart(3, '0')}`;
+}
+
+function findCycle(cycleId) {
+  for (const plan of S.plans) {
+    const cycle = plan.cycles.find(c => c.id === cycleId);
+    if (cycle) return { plan, cycle };
+  }
+  return { plan: null, cycle: null };
+}
+
+function classifySpec(path) {
+  if (!path) return 'unit';
+  if (path.endsWith('.integration.spec.ts')) return 'int';
+  if (/[/\\]e2e[/\\]/.test(path)) return 'e2e';
+  return 'unit';
+}
+
+function applyRunStatuses(run) {
+  if (!run || !Array.isArray(run.cases)) return;
+
+  for (const plan of S.plans) {
+    for (const cycle of plan.cycles || []) {
+      for (const testCase of cycle.cases || []) {
+        const update = run.cases.find(item =>
+          (item.caseId && item.caseId === testCase.id) ||
+          (!item.caseId &&
+            item.specFile === testCase.specFile &&
+            ((item.fullName && item.fullName === testCase.fullName) ||
+              (item.testName && item.testName === testCase.testName)))
+        );
+        if (update) {
+          testCase.status = update.status;
+        }
+      }
+    }
+  }
+}
+
+function isRunActive(run) {
+  return run && (run.lifecycle === 'queued' || run.lifecycle === 'running');
+}
+
+function stopRunPolling() {
+  if (S.runPollTimer) {
+    clearInterval(S.runPollTimer);
+    S.runPollTimer = null;
+  }
+}
+
+function syncRunPolling() {
+  stopRunPolling();
+  if (!isRunActive(S.activeRun)) return;
+  S.runPollTimer = setInterval(() => {
+    refreshActiveRun();
+  }, 1500);
+}
+
+async function refreshActiveRun() {
+  if (!S.activeRun?.runId) return;
+
+  try {
+    const data = await api('GET', `/api/test-runs/${encodeURIComponent(S.activeRun.runId)}`);
+    S.activeRun = data.run || null;
+    S.activeRunLog = data.logTail || '';
+    if (S.activeRun) applyRunStatuses(S.activeRun);
+    render();
+    if (!isRunActive(S.activeRun)) {
+      stopRunPolling();
+    }
+  } catch (e) {
+    stopRunPolling();
+    showToast('Run status refresh failed: ' + e.message, 'error');
+  }
+}
+
+async function refreshActiveRunLog() {
+  if (!S.activeRun?.runId) {
+    S.activeRunLog = '';
+    return;
+  }
+
+  try {
+    const data = await api('GET', `/api/test-runs/${encodeURIComponent(S.activeRun.runId)}/log`);
+    S.activeRunLog = data.log || '';
+  } catch {
+    S.activeRunLog = '';
+  }
+}
+
+function getCaseSelectionKey(planId, cycleId, caseId) {
+  return `${planId}::${cycleId}::${caseId}`;
+}
+
+function getPlanCases(planId) {
+  const plan = S.plans.find(p => p.id === planId);
+  if (!plan) return [];
+  return plan.cycles.flatMap(cycle => cycle.cases.map(testCase => ({ planId, cycleId: cycle.id, testCase })));
+}
+
+function getCycleCases(planId, cycleId) {
+  const plan = S.plans.find(p => p.id === planId);
+  const cycle = plan?.cycles.find(c => c.id === cycleId);
+  if (!cycle) return [];
+  return cycle.cases.map(testCase => ({ planId, cycleId, testCase }));
+}
+
+function getSelectedCasesForPlan(planId) {
+  return getPlanCases(planId).filter(({ planId: currentPlanId, cycleId, testCase }) =>
+    S.caseSelection[getCaseSelectionKey(currentPlanId, cycleId, testCase.id)],
+  );
+}
+
+function getSelectedCasesForCycle(planId, cycleId) {
+  return getCycleCases(planId, cycleId).filter(({ planId: currentPlanId, cycleId: currentCycleId, testCase }) =>
+    S.caseSelection[getCaseSelectionKey(currentPlanId, currentCycleId, testCase.id)],
+  );
+}
+
+function toggleCaseSelection(planId, cycleId, caseId, checked) {
+  const key = getCaseSelectionKey(planId, cycleId, caseId);
+  if (checked) S.caseSelection[key] = true;
+  else delete S.caseSelection[key];
+  renderContent();
+}
+
+function setPlanSelection(planId, checked) {
+  for (const { planId: currentPlanId, cycleId, testCase } of getPlanCases(planId)) {
+    const key = getCaseSelectionKey(currentPlanId, cycleId, testCase.id);
+    if (checked) S.caseSelection[key] = true;
+    else delete S.caseSelection[key];
+  }
+  renderContent();
+}
+
+async function clearPlanSelection(planId) {
+  setPlanSelection(planId, false);
+  await clearExecutionState();
+}
+
+function setCycleSelection(planId, cycleId, checked) {
+  for (const { planId: currentPlanId, cycleId: currentCycleId, testCase } of getCycleCases(planId, cycleId)) {
+    const key = getCaseSelectionKey(currentPlanId, currentCycleId, testCase.id);
+    if (checked) S.caseSelection[key] = true;
+    else delete S.caseSelection[key];
+  }
+  renderContent();
+}
+
+async function clearCycleSelection(planId, cycleId) {
+  setCycleSelection(planId, cycleId, false);
+  await clearExecutionState();
+}
+
+async function clearExecutionState() {
+  stopRunPolling();
+  S.activeRun = null;
+  S.activeRunLog = '';
+  render();
+
+  try {
+    await api('DELETE', '/api/test-runs/latest');
+  } catch (e) {
+    showToast('Execution reset failed: ' + e.message, 'error');
+  }
+}
+
+function findCollectedTestForCase(testCase) {
+  return S.collectedTests.find(item =>
+    item.specFile === testCase.specFile &&
+    ((testCase.fullName && item.fullName === testCase.fullName) ||
+      (testCase.testName && item.testName === testCase.testName))
+  ) || null;
+}
+
+function toRunnableCase(testCase) {
+  const collected = findCollectedTestForCase(testCase);
+  return {
+    id: testCase.id,
+    name: testCase.name,
+    specFile: testCase.specFile,
+    testName: testCase.testName || collected?.testName,
+    fullName: testCase.fullName || collected?.fullName,
+  };
+}
+
+async function runSelectedPlanTests(planId) {
+  const plan = S.plans.find(item => item.id === planId);
+  const selectedCases = getSelectedCasesForPlan(planId);
+  await runSelectedTests(selectedCases, plan?.name || 'Test plan');
+}
+
+async function runSelectedCycleTests(planId, cycleId) {
+  const { plan, cycle } = findCycle(cycleId);
+  const selectedCases = getSelectedCasesForCycle(planId, cycleId);
+  await runSelectedTests(selectedCases, `${plan?.name || 'Plan'} / ${cycle?.name || 'Cycle'}`);
+}
+
+async function runSelectedTests(selectedCases, scopeLabel) {
+  if (selectedCases.length === 0) {
+    showToast('Select at least one mapped test case before running tests.', 'error');
+    return;
+  }
+
+  showLoading('Starting background test run…');
+  try {
+    const response = await api('POST', '/api/test-runs', {
+      label: `Test Manager: ${scopeLabel}`,
+      cases: selectedCases.map(({ testCase }) => toRunnableCase(testCase)),
+    });
+    S.activeRun = response.run || null;
+    S.activeRunLog = response.logTail || '';
+    if (S.activeRun) {
+      applyRunStatuses(S.activeRun);
+      syncRunPolling();
+    }
+    render();
+    showToast(
+      `Started ${response.commandCount} background test command${response.commandCount === 1 ? '' : 's'} (${response.logFile}).`,
+      'success',
+    );
+  } catch (e) {
+    showToast('Run failed: ' + e.message, 'error');
+  } finally {
+    hideLoading();
+  }
+}
+
+// ─── Mutations ────────────────────────────────────────────────────────────────
+function deletePlan(planId, event) {
+  event?.stopPropagation?.();
+  if (!confirm('Delete this test plan and all its cycles/cases?')) return;
+  S.plans = S.plans.filter(p => p.id !== planId);
+  for (const key of Object.keys(S.caseSelection)) {
+    if (key.startsWith(`${planId}::`)) delete S.caseSelection[key];
+  }
+  if (S.selected?.id === planId) S.selected = null;
+  saveTestPlans();
+  render();
+  showToast('Plan deleted', 'info');
+}
+
+function deleteCycle(planId, cycleId, event) {
+  event?.stopPropagation?.();
+  if (!confirm('Delete this cycle and all its cases?')) return;
+  const plan = S.plans.find(p => p.id === planId);
+  if (plan) plan.cycles = plan.cycles.filter(c => c.id !== cycleId);
+  for (const key of Object.keys(S.caseSelection)) {
+    if (key.startsWith(`${planId}::${cycleId}::`)) delete S.caseSelection[key];
+  }
+  if (S.selected?.id === cycleId) S.selected = null;
+  saveTestPlans();
+  render();
+  showToast('Cycle deleted', 'info');
+}
+
+function removeCase(planId, cycleId, caseId) {
+  const plan = S.plans.find(p => p.id === planId);
+  const cycle = plan?.cycles.find(c => c.id === cycleId);
+  if (cycle) cycle.cases = cycle.cases.filter(c => c.id !== caseId);
+  delete S.caseSelection[getCaseSelectionKey(planId, cycleId, caseId)];
+  saveTestPlans();
+  render();
+  showToast('Case removed', 'info');
+}
+
+function updateCaseStatus(planId, cycleId, caseId, status) {
+  const plan = S.plans.find(p => p.id === planId);
+  const cycle = plan?.cycles.find(c => c.id === cycleId);
+  const tc = cycle?.cases.find(c => c.id === caseId);
+  if (tc) { tc.status = status; saveTestPlans(); }
+}
+
+// ─── Modals ──────────────────────────────────────────────────────────────────
+function openModal(type, parentId, event) {
+  event?.stopPropagation?.();
+  if (type === 'plan') showCreatePlanModal();
+  else if (type === 'cycle') showCreateCycleModal(parentId);
+}
+
+function showCreatePlanModal() {
+  const html = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>New Test Plan</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Plan Name</label>
+            <input id="modal-name" class="form-input" placeholder="e.g. Sprint 1 Regression" autofocus />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="createPlan()">Create Plan</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-container').innerHTML = html;
+  setTimeout(() => document.getElementById('modal-name')?.focus(), 50);
+}
+
+function createPlan() {
+  const name = document.getElementById('modal-name')?.value?.trim();
+  if (!name) { showToast('Please enter a plan name.', 'error'); return; }
+  const id = nextId('TP', S.plans);
+  S.plans.push({ id, name, cycles: [] });
+  S.expanded.add('plan-' + id);
+  saveTestPlans();
+  closeModal();
+  render();
+  showToast(`Plan "${name}" created`, 'success');
+}
+
+function showCreateCycleModal(planId) {
+  const plan = S.plans.find(p => p.id === planId);
+  if (!plan) return;
+  const html = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>New Cycle in "${esc(plan.name)}"</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Cycle Name</label>
+            <input id="modal-name" class="form-input" placeholder="e.g. Authentication Flow" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="createCycle('${escJsAttr(planId)}')">Create Cycle</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-container').innerHTML = html;
+  setTimeout(() => document.getElementById('modal-name')?.focus(), 50);
+}
+
+function createCycle(planId) {
+  const name = document.getElementById('modal-name')?.value?.trim();
+  if (!name) { showToast('Please enter a cycle name.', 'error'); return; }
+  const plan = S.plans.find(p => p.id === planId);
+  if (!plan) return;
+  const allCycles = S.plans.flatMap(p => p.cycles);
+  const id = nextId('CY', allCycles);
+  plan.cycles.push({ id, name, cases: [] });
+  S.expanded.add('plan-' + planId);
+  S.expanded.add('cycle-' + id);
+  saveTestPlans();
+  closeModal();
+  render();
+  showToast(`Cycle "${name}" created`, 'success');
+}
+
+function openAddCaseModal(planId, cycleId) {
+  const plan  = S.plans.find(p => p.id === planId);
+  const cycle = plan?.cycles.find(c => c.id === cycleId);
+  if (!cycle) return;
+
+  const grouped = {};
+  for (const t of S.collectedTests) {
+    if (!grouped[t.type]) grouped[t.type] = [];
+    grouped[t.type].push(t);
+  }
+  let optionsHtml = '<option value="">— custom case —</option>';
+  for (const [type, tests] of Object.entries(grouped)) {
+    optionsHtml += `<optgroup label="${type.toUpperCase()}">`;
+    for (const t of tests) {
+      optionsHtml += `<option value="${esc(t.displayName)}" data-spec="${esc(t.specFile)}" data-test="${esc(t.testName)}" data-full-name="${esc(t.fullName || '')}">${esc(t.displayName)}</option>`;
+    }
+    optionsHtml += '</optgroup>';
+  }
+
+  const html = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Add Case to "${esc(cycle.name)}"</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">From Test Cases</label>
+            <select id="modal-collected" class="form-select" onchange="onCollectedSelect(this)">${optionsHtml}</select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Case Name</label>
+            <input id="modal-name" class="form-input" placeholder="Test case name" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Spec File <span class="form-hint">(optional)</span></label>
+            <input id="modal-spec" class="form-input" placeholder="e.g. frontend/tests/e2e/auth.spec.ts" />
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="addCase('${escJsAttr(planId)}','${escJsAttr(cycleId)}')">Add Case</button>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('modal-container').innerHTML = html;
+}
+
+function onCollectedSelect(sel) {
+  const opt = sel.options[sel.selectedIndex];
+  const nameEl = document.getElementById('modal-name');
+  const specEl = document.getElementById('modal-spec');
+  if (!nameEl || !specEl) return;
+
+  if (sel.value) {
+    nameEl.value = sel.value;
+    nameEl.dataset.test = opt.dataset.test || '';
+    nameEl.dataset.fullName = opt.dataset.fullName || '';
+    specEl.value = opt.dataset.spec || '';
+  } else {
+    delete nameEl.dataset.test;
+    delete nameEl.dataset.fullName;
+  }
+}
+
+function addCase(planId, cycleId) {
+  const nameEl = document.getElementById('modal-name');
+  const name = nameEl?.value?.trim();
+  if (!name) { showToast('Please enter a case name.', 'error'); return; }
+  const testName = nameEl?.dataset?.test?.trim() || undefined;
+  const fullName = nameEl?.dataset?.fullName?.trim() || undefined;
+  const spec   = document.getElementById('modal-spec')?.value?.trim() || undefined;
+  const plan   = S.plans.find(p => p.id === planId);
+  const cycle  = plan?.cycles.find(c => c.id === cycleId);
+  if (!cycle) return;
+  const allCases = S.plans.flatMap(p => p.cycles.flatMap(c => c.cases));
+  const id = nextId('TC', allCases);
+  cycle.cases.push({ id, name, testName, fullName, specFile: spec, status: 'pending', steps: [] });
+  saveTestPlans();
+  closeModal();
+  render();
+  showToast(`Case "${name}" added`, 'success');
+}
+
+function openAddToPlanModal(event) {
+  const test = readTestPayload(event?.currentTarget?.dataset?.test);
+  if (!test) return;
+
+  let optHtml = '';
+  for (const plan of S.plans) {
+    optHtml += `<optgroup label="${esc(plan.name)}">`;
+    for (const cycle of plan.cycles) {
+      optHtml += `<option value="${plan.id}|${cycle.id}">${esc(cycle.name)}</option>`;
+    }
+    optHtml += '</optgroup>';
+  }
+
+  const html = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Add to Test Plan</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Test</label>
+            <div style="font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;">${esc(test.displayName)}</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Add to Cycle</label>
+            ${S.plans.length === 0
+              ? `<div style="font-size:12px;color:var(--text-muted);">No test plans yet. Create one first.</div>`
+              : `<select id="modal-cycle-target" class="form-select">${optHtml}</select>`}
+          </div>
+          ${S.plans.length > 0 ? `
+          <div class="form-group">
+            <label class="form-label">Case Name</label>
+            <input id="modal-name" class="form-input" value="${esc(test.displayName)}" />
+          </div>` : ''}
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          ${S.plans.length > 0
+            ? `<button class="btn btn-primary" onclick="addCollectedToPlan()">Add</button>`
+            : `<button class="btn btn-secondary" onclick="closeModal()">Close</button>`}
+        </div>
+      </div>
+    </div>`;
+  const modalContainer = document.getElementById('modal-container');
+  modalContainer.dataset.test = encodeURIComponent(JSON.stringify(test));
+  modalContainer.innerHTML = html;
+}
+
+function addCollectedToPlan() {
+  const modalContainer = document.getElementById('modal-container');
+  const test = readTestPayload(modalContainer?.dataset?.test);
+  if (!test) return;
+  const cycleTarget = document.getElementById('modal-cycle-target')?.value;
+  const name = document.getElementById('modal-name')?.value?.trim() || test.displayName;
+  if (!cycleTarget || !name) return;
+  const [planId, cycleId] = cycleTarget.split('|');
+  const plan  = S.plans.find(p => p.id === planId);
+  const cycle = plan?.cycles.find(c => c.id === cycleId);
+  if (!cycle) return;
+  const allCases = S.plans.flatMap(p => p.cycles.flatMap(c => c.cases));
+  const id = nextId('TC', allCases);
+  cycle.cases.push({ id, name, specFile: test.specFile, testName: test.testName, fullName: test.fullName, status: 'pending', steps: [] });
+  saveTestPlans();
+  closeModal();
+  render();
+  showToast(`Added to ${plan.name} / ${cycle.name}`, 'success');
+}
+
+function closeModal(event) {
+  if (event && event.target !== event.currentTarget) return;
+  const modalContainer = document.getElementById('modal-container');
+  delete modalContainer.dataset.test;
+  modalContainer.innerHTML = '';
+}
+
+function readTestPayload(payload) {
+  if (!payload) return null;
+  try {
+    return JSON.parse(decodeURIComponent(payload));
+  } catch {
+    showToast('Could not read the selected test case.', 'error');
+    return null;
+  }
+}
+
+// keyboard close
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeModal();
+});
+window.addEventListener('beforeunload', stopRunPolling);
+
+// ─── Toast ────────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'info') {
+  const c  = document.getElementById('toast-container');
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  c.appendChild(el);
+  setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ─── Loading ──────────────────────────────────────────────────────────────────
+function showLoading(msg) {
+  document.getElementById('loading-text').textContent = msg;
+  document.getElementById('loading-overlay').classList.remove('hidden');
+}
+function hideLoading() {
+  document.getElementById('loading-overlay').classList.add('hidden');
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function escAttr(s) {
+  return esc(s).replace(/'/g, '&#39;');
+}
+
+function escJsAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r/g, '\\r')
+    .replace(/\n/g, '\\n')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
+function breadcrumb(parts) {
+  return parts.map((p, i) =>
+    `<span class="breadcrumb-item ${i === parts.length-1 ? 'active' : ''}">${esc(p)}</span>`
+    + (i < parts.length-1 ? '<span class="breadcrumb-sep">/</span>' : '')
+  ).join('');
+}
+
+function emptyState(title, desc) {
+  return `<div class="empty-state">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+    </svg>
+    <h3>${title}</h3><p>${desc}</p></div>`;
+}
+
+// ─── Inline SVG Icons ─────────────────────────────────────────────────────────
+function iconChevron() {
+  return `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+}
+function iconPlus(s) {
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+}
+function iconTrash() {
+  return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+}
+function iconFolder(open) {
+  return open
+    ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d29922" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`
+    : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7d8590" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`;
+}
+function iconCycle() {
+  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+}
+function iconCycleInline() {
+  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#58a6ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`;
+}
+function iconBeaker() {
+  return `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#56d364" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v11l-5 5a2 2 0 0 0 1.4 3.4h13.2A2 2 0 0 0 20 19l-5-5V3"/></svg>`;
+}
+function iconPlay(s) {
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+}
+function iconMove(s) {
+  return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 18 12 21 15 18"/><line x1="2" y1="12" x2="12" y2="12"/><line x1="12" y1="21" x2="12" y2="11"/></svg>`;
+}
+
+// ─── Boot ────────────────────────────────────────────────────────────────────
+applyTheme(getPreferredTheme());
+setupLayoutResizers();
+loadState();
+</script>
+</body>
+</html>

@@ -1,5 +1,14 @@
 import path from 'node:path';
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export type TestExecutionStatus = 'pending' | 'passed' | 'failed' | 'skipped';
 export type TestRunLifecycleStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -109,8 +118,8 @@ function buildProgress(cases: PersistentTestRunCase[]): PersistentTestRunProgres
 
 async function writeLatestRunPointer(appRoot: string, runId: string): Promise<void> {
   const pointerPath = getLatestRunPointerPath(appRoot);
-  await fs.ensureDir(path.dirname(pointerPath));
-  await fs.writeJson(pointerPath, { runId }, { spaces: 2 });
+  await fsp.mkdir(path.dirname(pointerPath), { recursive: true });
+  await fsp.writeFile(pointerPath, JSON.stringify({ runId }, null, 2), 'utf-8');
 }
 
 export async function writeRunStatus(appRoot: string, status: PersistentTestRunStatus): Promise<void> {
@@ -120,27 +129,29 @@ export async function writeRunStatus(appRoot: string, status: PersistentTestRunS
     updatedAt: new Date().toISOString(),
     progress: buildProgress(status.cases),
   };
-  await fs.ensureDir(path.dirname(filePath));
-  await fs.writeJson(filePath, normalizedStatus, { spaces: 2 });
+  await fsp.mkdir(path.dirname(filePath), { recursive: true });
+  await fsp.writeFile(filePath, JSON.stringify(normalizedStatus, null, 2), 'utf-8');
   await writeLatestRunPointer(appRoot, status.runId);
 }
 
 export async function readRunStatus(appRoot: string, runId: string): Promise<PersistentTestRunStatus | null> {
   const filePath = getRunStatusFilePath(appRoot, runId);
-  if (!(await fs.pathExists(filePath))) {
+  if (!(await pathExists(filePath))) {
     return null;
   }
 
-  return fs.readJson(filePath) as Promise<PersistentTestRunStatus>;
+  const content = await fsp.readFile(filePath, 'utf-8');
+  return JSON.parse(content) as PersistentTestRunStatus;
 }
 
 export async function readLatestRunStatus(appRoot: string): Promise<PersistentTestRunStatus | null> {
   const pointerPath = getLatestRunPointerPath(appRoot);
-  if (!(await fs.pathExists(pointerPath))) {
+  if (!(await pathExists(pointerPath))) {
     return null;
   }
 
-  const data = await fs.readJson(pointerPath) as { runId?: string };
+  const content = await fsp.readFile(pointerPath, 'utf-8');
+  const data = JSON.parse(content) as { runId?: string };
   if (!data.runId) {
     return null;
   }
@@ -150,8 +161,8 @@ export async function readLatestRunStatus(appRoot: string): Promise<PersistentTe
 
 export async function clearLatestRunStatus(appRoot: string): Promise<void> {
   const pointerPath = getLatestRunPointerPath(appRoot);
-  if (await fs.pathExists(pointerPath)) {
-    await fs.remove(pointerPath);
+  if (await pathExists(pointerPath)) {
+    await fsp.rm(pointerPath, { recursive: true, force: true });
   }
 }
 
@@ -269,11 +280,12 @@ export async function applyStatusesToTestPlans(
   }>,
 ): Promise<void> {
   const testPlansPath = getTestPlansFilePath(appRoot);
-  if (!(await fs.pathExists(testPlansPath))) {
+  if (!(await pathExists(testPlansPath))) {
     return;
   }
 
-  const testPlans = await fs.readJson(testPlansPath) as PersistedTestPlansFile;
+  const content = await fsp.readFile(testPlansPath, 'utf-8');
+  const testPlans = JSON.parse(content) as PersistedTestPlansFile;
   const plans = testPlans.plans ?? [];
 
   for (const plan of plans) {
@@ -293,5 +305,5 @@ export async function applyStatusesToTestPlans(
     }
   }
 
-  await fs.writeJson(testPlansPath, testPlans, { spaces: 2 });
+  await fsp.writeFile(testPlansPath, JSON.stringify(testPlans, null, 2), 'utf-8');
 }

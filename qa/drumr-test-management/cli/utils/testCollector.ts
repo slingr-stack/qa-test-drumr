@@ -1,4 +1,5 @@
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
+import type { Dirent } from 'node:fs';
 import path from 'node:path';
 
 export interface CollectedTest {
@@ -115,9 +116,9 @@ scopes.push({ name: entry.name, openBrace: first.pos, closeBrace: close });
 async function findSpecFiles(dir: string, rel = ''): Promise<string[]> {
   const ignored = ['node_modules', 'dist', '.umi', 'coverage', '.cache'];
   const results: string[] = [];
-  let entries: fs.Dirent[];
+  let entries: Dirent[];
   try {
-    entries = await fs.readdir(path.join(dir, rel), { withFileTypes: true });
+    entries = await fsp.readdir(path.join(dir, rel), { withFileTypes: true });
   } catch {
     return results;
   }
@@ -144,7 +145,7 @@ export async function collectTestsFromApp(appRoot: string): Promise<CollectedTes
     const type = classifySpecFile(normalized);
     let content: string;
     try {
-      content = await fs.readFile(path.join(appRoot, relPath), 'utf-8');
+      content = await fsp.readFile(path.join(appRoot, relPath), 'utf-8');
     } catch {
       continue;
     }

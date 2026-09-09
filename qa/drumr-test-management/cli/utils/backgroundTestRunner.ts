@@ -1,8 +1,18 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import fs from 'fs-extra';
+import fs, { type WriteStream } from 'node:fs';
+import fsp from 'node:fs/promises';
 import { readJestCaseStatus, readPlaywrightCaseStatus } from './testResultParser';
 import { updateRunCase, updateRunLifecycle, type TestExecutionStatus } from './testRunState';
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 interface BackgroundTestCommand {
   label: string;
@@ -58,7 +68,7 @@ function formatCommand(command: BackgroundTestCommand): string {
 async function executeCommand(
   payload: BackgroundRunnerPayload,
   command: BackgroundTestCommand,
-  stream: fs.WriteStream,
+  stream: WriteStream,
 ): Promise<{ exitCode: number; status: TestExecutionStatus }> {
   const startedAt = new Date().toISOString();
   await updateRunCase(
@@ -71,7 +81,7 @@ async function executeCommand(
   stream.write(`\n[case] ${command.label}\n`);
   stream.write(`[cwd] ${command.cwd}\n`);
   stream.write(`$ ${formatCommand(command)}\n`);
-  await fs.remove(command.resultFilePath);
+  await fsp.rm(command.resultFilePath, { recursive: true, force: true });
 
   return new Promise(resolve => {
     const child = spawn(command.executable, command.args, {
@@ -132,8 +142,9 @@ async function run(): Promise<void> {
     throw new Error('Missing background test runner payload path.');
   }
 
-  const payload = (await fs.readJson(payloadPath)) as BackgroundRunnerPayload;
-  await fs.ensureDir(path.dirname(payload.logFilePath));
+  const payloadContent = await fsp.readFile(payloadPath, 'utf-8');
+  const payload = JSON.parse(payloadContent) as BackgroundRunnerPayload;
+  await fsp.mkdir(path.dirname(payload.logFilePath), { recursive: true });
   const stream = fs.createWriteStream(payload.logFilePath, { flags: 'a' });
 
   let exitCode = 0;
@@ -159,23 +170,24 @@ async function run(): Promise<void> {
   );
 
   await new Promise<void>(resolve => stream.end(resolve));
-  await fs.remove(payloadPath);
+  await fsp.rm(payloadPath, { recursive: true, force: true });
   process.exit(exitCode);
 }
 
 void run().catch(async error => {
   const payloadPath = process.argv[2];
-  if (payloadPath && (await fs.pathExists(payloadPath))) {
-    const payload = (await fs.readJson(payloadPath)) as BackgroundRunnerPayload;
-    await fs.ensureDir(path.dirname(payload.logFilePath));
-    await fs.appendFile(
+  if (payloadPath && (await pathExists(payloadPath))) {
+    const payloadContent = await fsp.readFile(payloadPath, 'utf-8');
+    const payload = JSON.parse(payloadContent) as BackgroundRunnerPayload;
+    await fsp.mkdir(path.dirname(payload.logFilePath), { recursive: true });
+    await fsp.appendFile(
       payload.logFilePath,
       `[fatal] ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`,
     );
     await updateRunLifecycle(payload.appRoot, payload.runId, 'failed', {
       finishedAt: new Date().toISOString(),
     });
-    await fs.remove(payloadPath);
+    await fsp.rm(payloadPath, { recursive: true, force: true });
   }
 
   process.exit(1);

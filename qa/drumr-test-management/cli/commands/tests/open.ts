@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 import type { Server } from 'node:http';
 import path from 'node:path';
 
@@ -17,6 +17,15 @@ export interface OpenTestsOptions {
   noOpen?: boolean;
 }
 
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function openTests(
   cwd: string = process.cwd(),
   options: OpenTestsOptions = {},
@@ -32,7 +41,7 @@ export async function openTests(
     process.exit(1);
   }
 
-  if (!(await fs.pathExists(testPlansPath))) {
+  if (!(await pathExists(testPlansPath))) {
     console.error(
       'Required test infrastructure was not found in this application.\n' +
         `Missing file: ${testPlansPath}\n` +

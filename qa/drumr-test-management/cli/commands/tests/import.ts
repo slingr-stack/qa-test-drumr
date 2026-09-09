@@ -1,4 +1,4 @@
-import fs from 'fs-extra';
+import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -8,6 +8,15 @@ const __dirname = path.dirname(__filename);
 export interface ImportOptions {
   targetDir: string;
   presetDir?: string;
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fsp.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function importTestManager(options: ImportOptions): Promise<void> {
@@ -25,7 +34,7 @@ export async function importTestManager(options: ImportOptions): Promise<void> {
 
   // Validate preset directory
   for (const dir of [sourceCommands, sourceUtils, sourceTemplates]) {
-    if (!(await fs.pathExists(dir))) {
+    if (!(await pathExists(dir))) {
       console.error(`Preset source not found: ${dir}`);
       process.exit(1);
     }
@@ -33,31 +42,31 @@ export async function importTestManager(options: ImportOptions): Promise<void> {
 
   // Validate target directory
   const targetPkg = path.join(targetDir, 'package.json');
-  if (!(await fs.pathExists(targetPkg))) {
+  if (!(await pathExists(targetPkg))) {
     console.error(`Target does not appear to be a valid project: ${targetDir}`);
     process.exit(1);
   }
 
   // Copy commands (except import.ts itself)
-  await fs.ensureDir(destCommands);
-  const commandFiles = await fs.readdir(sourceCommands);
+  await fsp.mkdir(destCommands, { recursive: true });
+  const commandFiles = await fsp.readdir(sourceCommands);
   for (const file of commandFiles) {
     if (file === 'import.ts') continue;
-    await fs.copy(path.join(sourceCommands, file), path.join(destCommands, file), { overwrite: true });
+    await fsp.cp(path.join(sourceCommands, file), path.join(destCommands, file), { recursive: true, force: true });
     console.log(`  copied  cli/src/commands/tests/${file}`);
   }
 
   // Copy utils
-  await fs.ensureDir(destUtils);
-  const utilFiles = await fs.readdir(sourceUtils);
+  await fsp.mkdir(destUtils, { recursive: true });
+  const utilFiles = await fsp.readdir(sourceUtils);
   for (const file of utilFiles) {
-    await fs.copy(path.join(sourceUtils, file), path.join(destUtils, file), { overwrite: true });
+    await fsp.cp(path.join(sourceUtils, file), path.join(destUtils, file), { recursive: true, force: true });
     console.log(`  copied  cli/src/utils/${file}`);
   }
 
   // Copy templates
-  await fs.ensureDir(destTemplates);
-  await fs.copy(sourceTemplates, destTemplates, { overwrite: true });
+  await fsp.mkdir(destTemplates, { recursive: true });
+  await fsp.cp(sourceTemplates, destTemplates, { recursive: true, force: true });
   console.log(`  copied  cli/src/templates/test-ui/`);
 
   console.log('\nTest-manager preset imported successfully.');
