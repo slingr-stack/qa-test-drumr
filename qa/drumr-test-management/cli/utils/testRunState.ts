@@ -1,14 +1,4 @@
-import path from 'node:path';
-import fsp from 'node:fs/promises';
-
-async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await fsp.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import type { StorageAdapter } from './storage/index.js';
 
 export type TestExecutionStatus = 'pending' | 'passed' | 'failed' | 'skipped';
 export type TestRunLifecycleStatus = 'queued' | 'running' | 'completed' | 'failed';
@@ -69,9 +59,26 @@ interface PersistedTestPlansFile {
   collectedTests?: unknown[];
 }
 
-const TEST_MANAGER_LOG_DIR = ['logs', 'test-manager'] as const;
-const TEST_PLANS_PATH = ['testsManagement', 'test-plans.json'] as const;
-const LATEST_RUN_POINTER = 'latest-run.json';
+/** Storage key prefix for every Test Manager artefact of a run. */
+export const TEST_MANAGER_DIR_KEY = 'logs/test-manager';
+export const TEST_PLANS_KEY = 'testsManagement/test-plans.json';
+export const LATEST_RUN_POINTER_KEY = `${TEST_MANAGER_DIR_KEY}/latest-run.json`;
+
+export function getRunStatusKey(runId: string): string {
+  return `${TEST_MANAGER_DIR_KEY}/${runId}.status.json`;
+}
+
+export function getRunLogKey(runId: string): string {
+  return `${TEST_MANAGER_DIR_KEY}/${runId}.log`;
+}
+
+export function getRunPayloadKey(runId: string): string {
+  return `${TEST_MANAGER_DIR_KEY}/${runId}.payload.json`;
+}
+
+export function getRunCaseResultKey(runId: string, index: number): string {
+  return `${TEST_MANAGER_DIR_KEY}/${runId}-case-${String(index + 1).padStart(3, '0')}.json`;
+}
 
 function withOptionalProps<T extends object>(base: T, optional: Record<string, unknown>): T {
   const definedOptionalEntries = Object.entries(optional).filter(([, value]) => value !== undefined);
@@ -79,22 +86,6 @@ function withOptionalProps<T extends object>(base: T, optional: Record<string, u
     ...base,
     ...Object.fromEntries(definedOptionalEntries),
   };
-}
-
-export function getTestManagerDir(appRoot: string): string {
-  return path.join(appRoot, ...TEST_MANAGER_LOG_DIR);
-}
-
-export function getRunStatusFilePath(appRoot: string, runId: string): string {
-  return path.join(getTestManagerDir(appRoot), `${runId}.status.json`);
-}
-
-export function getLatestRunPointerPath(appRoot: string): string {
-  return path.join(getTestManagerDir(appRoot), LATEST_RUN_POINTER);
-}
-
-export function getTestPlansFilePath(appRoot: string): string {
-  return path.join(appRoot, ...TEST_PLANS_PATH);
 }
 
 function buildProgress(cases: PersistentTestRunCase[]): PersistentTestRunProgress {
@@ -116,58 +107,58 @@ function buildProgress(cases: PersistentTestRunCase[]): PersistentTestRunProgres
   };
 }
 
-async function writeLatestRunPointer(appRoot: string, runId: string): Promise<void> {
-  const pointerPath = getLatestRunPointerPath(appRoot);
-  await fsp.mkdir(path.dirname(pointerPath), { recursive: true });
-  await fsp.writeFile(pointerPath, JSON.stringify({ runId }, null, 2), 'utf-8');
+async function writeLatestRunPointer(storage: StorageAdapter, runId: string): Promise<void> {
+  await storage.writeText(LATEST_RUN_POINTER_KEY, JSON.stringify({ runId }, null, 2));
 }
 
-export async function writeRunStatus(appRoot: string, status: PersistentTestRunStatus): Promise<void> {
-  const filePath = getRunStatusFilePath(appRoot, status.runId);
+export async function writeRunStatus(
+  storage: StorageAdapter,
+  status: PersistentTestRunStatus,
+): Promise<void> {
   const normalizedStatus: PersistentTestRunStatus = {
     ...status,
     updatedAt: new Date().toISOString(),
     progress: buildProgress(status.cases),
   };
-  await fsp.mkdir(path.dirname(filePath), { recursive: true });
-  await fsp.writeFile(filePath, JSON.stringify(normalizedStatus, null, 2), 'utf-8');
-  await writeLatestRunPointer(appRoot, status.runId);
+
+  await storage.writeText(getRunStatusKey(status.runId), JSON.stringify(normalizedStatus, null, 2));
+  await writeLatestRunPointer(storage, status.runId);
 }
 
-export async function readRunStatus(appRoot: string, runId: string): Promise<PersistentTestRunStatus | null> {
-  const filePath = getRunStatusFilePath(appRoot, runId);
-  if (!(await pathExists(filePath))) {
+export async function readRunStatus(
+  storage: StorageAdapter,
+  runId: string,
+): Promise<PersistentTestRunStatus | null> {
+  const content = await storage.readText(getRunStatusKey(runId));
+  if (content === null) {
     return null;
   }
 
-  const content = await fsp.readFile(filePath, 'utf-8');
   return JSON.parse(content) as PersistentTestRunStatus;
 }
 
-export async function readLatestRunStatus(appRoot: string): Promise<PersistentTestRunStatus | null> {
-  const pointerPath = getLatestRunPointerPath(appRoot);
-  if (!(await pathExists(pointerPath))) {
+export async function readLatestRunStatus(
+  storage: StorageAdapter,
+): Promise<PersistentTestRunStatus | null> {
+  const content = await storage.readText(LATEST_RUN_POINTER_KEY);
+  if (content === null) {
     return null;
   }
 
-  const content = await fsp.readFile(pointerPath, 'utf-8');
   const data = JSON.parse(content) as { runId?: string };
   if (!data.runId) {
     return null;
   }
 
-  return readRunStatus(appRoot, data.runId);
+  return readRunStatus(storage, data.runId);
 }
 
-export async function clearLatestRunStatus(appRoot: string): Promise<void> {
-  const pointerPath = getLatestRunPointerPath(appRoot);
-  if (await pathExists(pointerPath)) {
-    await fsp.rm(pointerPath, { recursive: true, force: true });
-  }
+export async function clearLatestRunStatus(storage: StorageAdapter): Promise<void> {
+  await storage.deleteKey(LATEST_RUN_POINTER_KEY);
 }
 
 export async function initializeRunStatus(
-  appRoot: string,
+  storage: StorageAdapter,
   input: {
     runId: string;
     label: string;
@@ -185,8 +176,8 @@ export async function initializeRunStatus(
     cases: input.cases,
   };
 
-  await writeRunStatus(appRoot, status);
-  await applyStatusesToTestPlans(appRoot, input.cases.map(testCase => withOptionalProps({
+  await writeRunStatus(storage, status);
+  await applyStatusesToTestPlans(storage, input.cases.map(testCase => withOptionalProps({
     status: testCase.status,
   }, {
     caseId: testCase.caseId,
@@ -198,12 +189,12 @@ export async function initializeRunStatus(
 }
 
 export async function updateRunLifecycle(
-  appRoot: string,
+  storage: StorageAdapter,
   runId: string,
   lifecycle: TestRunLifecycleStatus,
   extra: Partial<Pick<PersistentTestRunStatus, 'startedAt' | 'finishedAt'>> = {},
 ): Promise<PersistentTestRunStatus | null> {
-  const current = await readRunStatus(appRoot, runId);
+  const current = await readRunStatus(storage, runId);
   if (!current) {
     return null;
   }
@@ -213,17 +204,18 @@ export async function updateRunLifecycle(
     lifecycle,
     ...extra,
   };
-  await writeRunStatus(appRoot, next);
+
+  await writeRunStatus(storage, next);
   return next;
 }
 
 export async function updateRunCase(
-  appRoot: string,
+  storage: StorageAdapter,
   runId: string,
   matcher: { caseId?: string; specFile?: string; testName?: string; fullName?: string },
   patch: Partial<PersistentTestRunCase>,
 ): Promise<PersistentTestRunStatus | null> {
-  const current = await readRunStatus(appRoot, runId);
+  const current = await readRunStatus(storage, runId);
   if (!current) {
     return null;
   }
@@ -253,10 +245,10 @@ export async function updateRunCase(
     cases: nextCases,
   };
 
-  await writeRunStatus(appRoot, next);
+  await writeRunStatus(storage, next);
 
   if (patch.status) {
-    await applyStatusesToTestPlans(appRoot, nextCases.map(testCase => withOptionalProps({
+    await applyStatusesToTestPlans(storage, nextCases.map(testCase => withOptionalProps({
       status: testCase.status,
     }, {
       caseId: testCase.caseId,
@@ -270,7 +262,7 @@ export async function updateRunCase(
 }
 
 export async function applyStatusesToTestPlans(
-  appRoot: string,
+  storage: StorageAdapter,
   updates: Array<{
     caseId?: string;
     specFile?: string;
@@ -279,12 +271,11 @@ export async function applyStatusesToTestPlans(
     status: TestExecutionStatus;
   }>,
 ): Promise<void> {
-  const testPlansPath = getTestPlansFilePath(appRoot);
-  if (!(await pathExists(testPlansPath))) {
+  const content = await storage.readText(TEST_PLANS_KEY);
+  if (content === null) {
     return;
   }
 
-  const content = await fsp.readFile(testPlansPath, 'utf-8');
   const testPlans = JSON.parse(content) as PersistedTestPlansFile;
   const plans = testPlans.plans ?? [];
 
@@ -305,5 +296,5 @@ export async function applyStatusesToTestPlans(
     }
   }
 
-  await fsp.writeFile(testPlansPath, JSON.stringify(testPlans, null, 2), 'utf-8');
+  await storage.writeText(TEST_PLANS_KEY, JSON.stringify(testPlans, null, 2));
 }

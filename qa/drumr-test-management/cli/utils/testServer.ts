@@ -2,9 +2,16 @@ import http from 'node:http';
 import path from 'node:path';
 import fsp from 'node:fs/promises';
 import { collectTestsFromApp, type CollectedTest } from './testCollector.js';
-import { clearLatestRunStatus, readLatestRunStatus, readRunStatus } from './testRunState';
+import {
+  clearLatestRunStatus,
+  getRunLogKey,
+  readLatestRunStatus,
+  readRunStatus,
+  TEST_PLANS_KEY,
+} from './testRunState';
 import { startBackgroundTestRun } from './testRunPlanner';
 import { readJestCaseSummary, readPlaywrightCaseSummary } from './testResultParser';
+import type { StorageAdapter } from './storage/index.js';
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -66,7 +73,6 @@ type TestPlansLoadResult =
   | { ok: true; data: TestPlansFile }
   | { ok: false; error: TestPlansFileError };
 
-const TEST_PLANS_PATH = ['testsManagement', 'test-plans.json'] as const;
 const APP_LOGO_CANDIDATES = [
   ['frontend', 'public', 'logo.svg'],
   ['frontend', 'public', 'logo.png'],
@@ -76,14 +82,13 @@ const APP_LOGO_CANDIDATES = [
   ['frontend', 'public', 'favicon.png'],
 ] as const;
 
-async function loadTestPlans(appRoot: string): Promise<TestPlansLoadResult> {
-  const testPlansPath = path.join(appRoot, ...TEST_PLANS_PATH);
-  if (!(await pathExists(testPlansPath))) {
+async function loadTestPlans(storage: StorageAdapter): Promise<TestPlansLoadResult> {
+  const content = await storage.readText(TEST_PLANS_KEY);
+  if (content === null) {
     return { ok: true, data: { plans: [], caseFolders: [], collectedTests: [] } };
   }
 
   try {
-    const content = await fsp.readFile(testPlansPath, 'utf-8');
     const data = JSON.parse(content) as TestPlansFile;
     return {
       ok: true,
@@ -98,18 +103,16 @@ async function loadTestPlans(appRoot: string): Promise<TestPlansLoadResult> {
       ok: false,
       error: {
         code: 'INVALID_TEST_PLANS',
-        message: 'testsManagement/test-plans.json is invalid. Fix or back up the file before using Test Manager.',
-        filePath: testPlansPath,
+        message: `${TEST_PLANS_KEY} is invalid. Fix or back up the file before using Test Manager.`,
+        filePath: TEST_PLANS_KEY,
         details: error instanceof Error ? error.message : String(error),
       },
     };
   }
 }
 
-async function saveTestPlans(appRoot: string, data: TestPlansFile): Promise<void> {
-  const testPlansPath = path.join(appRoot, ...TEST_PLANS_PATH);
-  await fsp.mkdir(path.dirname(testPlansPath), { recursive: true });
-  await fsp.writeFile(testPlansPath, JSON.stringify(data, null, 2), 'utf-8');
+async function saveTestPlans(storage: StorageAdapter, data: TestPlansFile): Promise<void> {
+  await storage.writeText(TEST_PLANS_KEY, JSON.stringify(data, null, 2));
 }
 
 function json(res: http.ServerResponse, statusCode: number, body: unknown): void {
@@ -164,24 +167,23 @@ function formatRunLogLine(prefix: string, message: string, details?: string): st
   return details ? `${prefix} ${message}\n${details}` : `${prefix} ${message}`;
 }
 
-async function readRunLogTail(appRoot: string, runId: string, maxLines = 160): Promise<string | null> {
-  const run = await readRunStatus(appRoot, runId);
+async function readRunLogTail(storage: StorageAdapter, runId: string, maxLines = 160): Promise<string | null> {
+  const run = await readRunStatus(storage, runId);
   if (!run) {
     return null;
   }
 
-  const logPath = path.join(appRoot, run.logFileRelativePath);
-  if (!(await pathExists(logPath))) {
+  const content = await storage.readText(getRunLogKey(runId));
+  if (content === null) {
     return '';
   }
 
-  const content = await fsp.readFile(logPath, 'utf-8');
   const lines = content.split(/\r?\n/);
   return lines.slice(-maxLines).join('\n');
 }
 
-async function buildRunLogSummary(appRoot: string, runId: string): Promise<string | null> {
-  const run = await readRunStatus(appRoot, runId);
+async function buildRunLogSummary(storage: StorageAdapter, appRoot: string, runId: string): Promise<string | null> {
+  const run = await readRunStatus(storage, runId);
   if (!run) {
     return null;
   }
@@ -230,15 +232,15 @@ async function buildRunLogSummary(appRoot: string, runId: string): Promise<strin
   return lines.join('\n\n').trim();
 }
 
-async function buildRunResponse(appRoot: string, runId: string): Promise<{ run: Awaited<ReturnType<typeof readRunStatus>>; logTail: string } | null> {
-  const run = await readRunStatus(appRoot, runId);
+async function buildRunResponse(storage: StorageAdapter, appRoot: string, runId: string): Promise<{ run: Awaited<ReturnType<typeof readRunStatus>>; logTail: string } | null> {
+  const run = await readRunStatus(storage, runId);
   if (!run) {
     return null;
   }
 
   return {
     run,
-    logTail: (await buildRunLogSummary(appRoot, runId)) ?? '',
+    logTail: (await buildRunLogSummary(storage, appRoot, runId)) ?? '',
   };
 }
 
@@ -246,6 +248,7 @@ export async function createTestServer(
   appRoot: string,
   port: number,
   htmlPath: string,
+  storage: StorageAdapter,
 ): Promise<http.Server> {
   let appName = path.basename(appRoot);
   try {
@@ -274,14 +277,14 @@ appName = pkg.name as string;
       }
 
       if (url === '/api/state' && method === 'GET') {
-        const plansData = await loadTestPlans(appRoot);
+        const plansData = await loadTestPlans(storage);
         if (!plansData.ok) {
           json(res, 409, plansData.error);
           return;
         }
 
-        const activeRun = await readLatestRunStatus(appRoot);
-        const activeRunLogTail = activeRun ? ((await buildRunLogSummary(appRoot, activeRun.runId)) ?? '') : '';
+        const activeRun = await readLatestRunStatus(storage);
+        const activeRunLogTail = activeRun ? ((await buildRunLogSummary(storage, appRoot, activeRun.runId)) ?? '') : '';
         json(res, 200, {
           appName,
           appRoot,
@@ -316,7 +319,7 @@ appName = pkg.name as string;
       }
 
       if (url === '/api/test-plans' && method === 'PUT') {
-        const currentPlans = await loadTestPlans(appRoot);
+        const currentPlans = await loadTestPlans(storage);
         if (!currentPlans.ok) {
           json(res, 409, currentPlans.error);
           return;
@@ -332,7 +335,7 @@ appName = pkg.name as string;
         }
 
         try {
-          await saveTestPlans(appRoot, data);
+          await saveTestPlans(storage, data);
           json(res, 200, { ok: true });
         } catch (err) {
           json(res, 500, { error: getErrorMessage(err) });
@@ -358,11 +361,12 @@ appName = pkg.name as string;
 
         try {
           const runPlan = await startBackgroundTestRun(
+            storage,
             appRoot,
             data.label?.trim() || `Test Manager run (${cases.length} test${cases.length === 1 ? '' : 's'})`,
             cases,
           );
-          const response = await buildRunResponse(appRoot, runPlan.runId);
+          const response = await buildRunResponse(storage, appRoot, runPlan.runId);
 
           json(res, 202, {
             ok: true,
@@ -378,14 +382,14 @@ appName = pkg.name as string;
       }
 
       if (url === '/api/test-runs/latest' && method === 'GET') {
-        const run = await readLatestRunStatus(appRoot);
-        const logTail = run ? ((await buildRunLogSummary(appRoot, run.runId)) ?? '') : '';
+        const run = await readLatestRunStatus(storage);
+        const logTail = run ? ((await buildRunLogSummary(storage, appRoot, run.runId)) ?? '') : '';
         json(res, 200, { run, logTail });
         return;
       }
 
       if (url === '/api/test-runs/latest' && method === 'DELETE') {
-        await clearLatestRunStatus(appRoot);
+        await clearLatestRunStatus(storage);
         json(res, 200, { ok: true });
         return;
       }
@@ -396,7 +400,7 @@ appName = pkg.name as string;
 
         if (logMatch) {
           const runId = decodeURIComponent(logMatch[1]);
-          const log = await buildRunLogSummary(appRoot, runId);
+          const log = await buildRunLogSummary(storage, appRoot, runId);
           if (log === null) {
             json(res, 404, { error: 'Run not found.' });
             return;
@@ -412,7 +416,7 @@ appName = pkg.name as string;
           return;
         }
 
-        const response = await buildRunResponse(appRoot, runId);
+        const response = await buildRunResponse(storage, appRoot, runId);
         if (!response) {
           json(res, 404, { error: 'Run not found.' });
           return;

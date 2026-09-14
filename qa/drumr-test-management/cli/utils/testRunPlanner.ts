@@ -4,9 +4,20 @@ import path from 'node:path';
 import fsp from 'node:fs/promises';
 import {
   type PersistentTestRunCase,
-  getTestManagerDir,
   initializeRunStatus,
 } from './testRunState';
+import type { StorageAdapter } from './storage/index.js';
+
+/**
+ * Test runners (Jest/Playwright) and the background process handoff require real
+ * filesystem paths, so execution artefacts always live under the app root.
+ * Only the run status and the log content are routed through the storage adapter.
+ */
+const TEST_MANAGER_LOG_DIR = ['logs', 'test-manager'] as const;
+
+function getLocalTestManagerDir(appRoot: string): string {
+  return path.join(appRoot, ...TEST_MANAGER_LOG_DIR);
+}
 
 export interface RunnableTestCase {
   id?: string;
@@ -116,7 +127,7 @@ function buildCommand(appRoot: string, runId: string, index: number, testCase: R
   const specFile = normalizeSpecFile(testCase.specFile);
   const testName = testCase.testName?.trim();
   const jestNamePattern = resolveJestTestNamePattern(testCase);
-  const resultFilePath = path.join(getTestManagerDir(appRoot), `${runId}-case-${String(index + 1).padStart(3, '0')}.json`);
+  const resultFilePath = path.join(getLocalTestManagerDir(appRoot), `${runId}-case-${String(index + 1).padStart(3, '0')}.json`);
 
   if (specFile.startsWith('backend/')) {
     const args = [
@@ -229,7 +240,7 @@ export function planBackgroundTestRun(
   );
 
   const runId = `tm-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-  const logDir = path.join(appRoot, 'logs', 'test-manager');
+  const logDir = getLocalTestManagerDir(appRoot);
   const logFilePath = path.join(logDir, `${runId}.log`);
 
   return {
@@ -242,6 +253,7 @@ export function planBackgroundTestRun(
 }
 
 export async function startBackgroundTestRun(
+  storage: StorageAdapter,
   appRoot: string,
   label: string,
   cases: RunnableTestCase[],
@@ -261,7 +273,7 @@ export async function startBackgroundTestRun(
     fullName: command.fullName,
   }));
 
-  await initializeRunStatus(appRoot, {
+  await initializeRunStatus(storage, {
     runId: plan.runId,
     label: plan.label,
     logFileRelativePath: plan.logFileRelativePath,

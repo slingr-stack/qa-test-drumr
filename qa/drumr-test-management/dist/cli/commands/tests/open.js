@@ -10,6 +10,7 @@ const node_path_1 = __importDefault(require("node:path"));
 const checkFramework_js_1 = require("../../utils/checkFramework.js");
 const portChecker_js_1 = require("../../utils/portChecker.js");
 const testServer_js_1 = require("../../utils/testServer.js");
+const index_js_1 = require("../../utils/storage/index.js");
 const UI_HTML_PATH = node_path_1.default.join(__dirname, '..', '..', 'templates', 'test-ui', 'index.html');
 const TEST_PLANS_PATH = node_path_1.default.join('testsManagement', 'test-plans.json');
 const DEFAULT_PORT = 4000;
@@ -46,13 +47,15 @@ async function openTests(cwd = process.cwd(), options = {}) {
     }
     const url = `http://localhost:${port}`;
     console.log(`Starting Drumr Test Manager at ${url} ...`);
-    const server = await (0, testServer_js_1.createTestServer)(cwd, port, UI_HTML_PATH);
+    const storage = await (0, index_js_1.createStorageAdapter)(cwd);
+    const server = await (0, testServer_js_1.createTestServer)(cwd, port, UI_HTML_PATH, storage);
     if (!noOpen) {
         openBrowser(url);
     }
     console.log(`Test Manager is running at ${url}`);
+    console.log(`State storage: ${storage.kind}`);
     console.log('Press Ctrl+C to stop.\n');
-    await waitForShutdown(server);
+    await waitForShutdown(server, () => storage.close());
     console.log('\nTest Manager stopped.');
 }
 function openBrowser(url) {
@@ -72,7 +75,7 @@ function openBrowser(url) {
         // Non-fatal
     }
 }
-function waitForShutdown(server) {
+function waitForShutdown(server, onShutdown) {
     return new Promise((resolve, reject) => {
         const shutdown = () => {
             process.off('SIGINT', shutdown);
@@ -84,6 +87,8 @@ function waitForShutdown(server) {
                 }
                 resolve();
             });
+            // Flush buffered state (relevant for remote storage) without blocking shutdown.
+            void onShutdown?.();
         };
         process.once('SIGINT', shutdown);
         process.once('SIGTERM', shutdown);

@@ -6,6 +6,7 @@ import path from 'node:path';
 import { hasDrumrFramework } from '../../utils/checkFramework.js';
 import { findAvailablePort } from '../../utils/portChecker.js';
 import { createTestServer } from '../../utils/testServer.js';
+import { createStorageAdapter } from '../../utils/storage/index.js';
 
 const UI_HTML_PATH = path.join(__dirname, '..', '..', 'templates', 'test-ui', 'index.html');
 const TEST_PLANS_PATH = path.join('testsManagement', 'test-plans.json');
@@ -63,16 +64,18 @@ export async function openTests(
   const url = `http://localhost:${port}`;
   console.log(`Starting Drumr Test Manager at ${url} ...`);
 
-  const server = await createTestServer(cwd, port, UI_HTML_PATH);
+  const storage = await createStorageAdapter(cwd);
+  const server = await createTestServer(cwd, port, UI_HTML_PATH, storage);
 
   if (!noOpen) {
     openBrowser(url);
   }
 
   console.log(`Test Manager is running at ${url}`);
+  console.log(`State storage: ${storage.kind}`);
   console.log('Press Ctrl+C to stop.\n');
 
-  await waitForShutdown(server);
+  await waitForShutdown(server, () => storage.close());
   console.log('\nTest Manager stopped.');
 }
 
@@ -91,7 +94,7 @@ function openBrowser(url: string): void {
   }
 }
 
-function waitForShutdown(server: Server): Promise<void> {
+function waitForShutdown(server: Server, onShutdown?: () => Promise<void>): Promise<void> {
   return new Promise((resolve, reject) => {
     const shutdown = () => {
       process.off('SIGINT', shutdown);
@@ -104,6 +107,9 @@ function waitForShutdown(server: Server): Promise<void> {
         }
         resolve();
       });
+
+      // Flush buffered state (relevant for remote storage) without blocking shutdown.
+      void onShutdown?.();
     };
 
     process.once('SIGINT', shutdown);
