@@ -1,4 +1,5 @@
 import { type ChildProcess, type SpawnOptions } from 'node:child_process';
+import type { StorageAdapter } from './storage/index.js';
 export interface RunnableTestCase {
     id?: string;
     name: string;
@@ -28,5 +29,5 @@ export interface BackgroundTestRunPlan {
 }
 type SpawnProcess = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
 export declare function planBackgroundTestRun(appRoot: string, label: string, cases: RunnableTestCase[]): BackgroundTestRunPlan;
-export declare function startBackgroundTestRun(appRoot: string, label: string, cases: RunnableTestCase[], spawnProcess?: SpawnProcess): Promise<BackgroundTestRunPlan>;
+export declare function startBackgroundTestRun(storage: StorageAdapter, appRoot: string, label: string, cases: RunnableTestCase[], spawnProcess?: SpawnProcess): Promise<BackgroundTestRunPlan>;
 export {};

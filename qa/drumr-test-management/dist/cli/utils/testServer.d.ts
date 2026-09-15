@@ -1,5 +1,6 @@
 import http from 'node:http';
 import { type CollectedTest } from './testCollector.js';
+import type { StorageAdapter } from './storage/index.js';
 export interface TestPlanCase {
     id: string;
     name: string;
@@ -30,4 +31,4 @@ export interface TestPlansFile {
     caseFolders: TestPlanCaseFolder[];
     collectedTests?: CollectedTest[];
 }
-export declare function createTestServer(appRoot: string, port: number, htmlPath: string): Promise<http.Server>;
+export declare function createTestServer(appRoot: string, port: number, htmlPath: string, storage: StorageAdapter): Promise<http.Server>;

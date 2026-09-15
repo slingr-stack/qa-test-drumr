@@ -201,3 +201,146 @@ drumr-test-manager open --port 5000
 ```
 
 No file copy or post-build custom asset movements are required from the consumer project, as the package internally resolves UI pages inside its own `node_modules/@drumr/test-management/dist/...` directory structure.
+
+---
+
+## 4. Consuming the published package from any app
+
+The package is published to the QA Artifact Registry on Google Cloud:
+
+```
+https://us-central1-npm.pkg.dev/slingr-qa/drumr-npm/
+```
+
+### Prerequisites (once per machine)
+
+```bash
+gcloud auth login                     # publish + registry access
+gcloud auth application-default login # required only for Cloud Storage state
+```
+
+> **Cloud Storage credential gotcha.** On the consent page you must tick *every*
+> checkbox, in particular the Google Cloud data permission. Skipping it fails
+> the login with:
+>
+> ```
+> AuthRequestFailedError: https://www.googleapis.com/auth/cloud-platform
+> scope is required but not consented.
+> ```
+>
+> Alternatively, point `GOOGLE_APPLICATION_CREDENTIALS` at a service account key
+> (handy for CI). The account needs `roles/storage.objectAdmin` on the bucket.
+
+### Install in the target app
+
+Add the scoped registry to the app's `.npmrc`:
+
+```
+@drumr:registry=https://us-central1-npm.pkg.dev/slingr-qa/drumr-npm/
+//us-central1-npm.pkg.dev/slingr-qa/drumr-npm/:_authToken=<gcp-access-token>
+```
+
+Generate the token with `gcloud auth print-access-token` (valid ~1 hour), then:
+
+```bash
+pnpm add @drumr/test-management@beta
+```
+
+### Run
+
+From the root of the Drumr app (the directory containing `backend/package.json`):
+
+```bash
+pnpm exec drumr-test-manager setup   # one-time: scaffold testsManagement/ and test dirs
+pnpm exec drumr-test-manager open    # launches the UI on http://localhost:4000
+```
+
+Requirements for the app under test:
+- `backend/package.json` declaring `@drumr/framework-backend`.
+- Jest configured for `backend/` and `frontend/`; Playwright available at the workspace root for E2E.
+
+---
+
+## 5. State storage: local (default) or Cloud Storage
+
+All Test Manager state (test plans, run status, run logs) is written through a
+single `StorageAdapter` interface. Two implementations ship with the package.
+
+| Environment variable | Values | Default |
+|---|---|---|
+| `DRUMR_TEST_MANAGER_STORAGE` | `local`, `gcs` | `local` |
+| `DRUMR_TEST_MANAGER_GCS_BUCKET` | bucket name | — (required for `gcs`) |
+| `DRUMR_TEST_MANAGER_GCS_PREFIX` | object prefix | app directory name |
+
+### Local (default)
+
+Zero configuration and works offline. State lives under the app root exactly as
+before, so no migration is needed:
+
+```
+testsManagement/test-plans.json
+logs/test-manager/<runId>.status.json
+logs/test-manager/<runId>.log
+```
+
+### Cloud Storage
+
+Enables shared test plans and run history across machines and teams:
+
+```bash
+export DRUMR_TEST_MANAGER_STORAGE=gcs
+export DRUMR_TEST_MANAGER_GCS_BUCKET=slingr-qa-drumr-test-manager
+export DRUMR_TEST_MANAGER_GCS_PREFIX=my-app          # optional
+pnpm exec drumr-test-manager open
+```
+
+The Cloud Storage adapter requires `@google-cloud/storage`, declared as an
+**optional peer dependency**. Install it only when you enable GCS:
+
+```bash
+pnpm add @google-cloud/storage
+```
+
+Authentication uses Application Default Credentials. The service account or user
+needs `roles/storage.objectAdmin` on the bucket.
+
+### Storage key layout
+
+| Key | Contents |
+|---|---|
+| `testsManagement/test-plans.json` | Plans, cycles, mapped cases |
+| `logs/test-manager/latest-run.json` | Pointer to the most recent run |
+| `logs/test-manager/<runId>.status.json` | Lifecycle, progress, per-case status |
+| `logs/test-manager/<runId>.log` | Execution log stream |
+
+With `DRUMR_TEST_MANAGER_GCS_PREFIX=<prefix>`, each key becomes
+`<prefix>/<key>` inside the bucket, so several apps can share one bucket.
+
+### What stays on the local filesystem
+
+Jest and Playwright must write their JSON reports to real paths, and the
+background runner is handed a payload file, so these artefacts always stay local
+under `logs/test-manager/`:
+
+- `<runId>-case-NNN.json` (runner result reports)
+- `<runId>.payload.json` (server → background runner handoff)
+
+---
+
+## 6. Publishing a new version
+
+```bash
+cd qa/drumr-test-management
+pnpm install --ignore-workspace --ignore-scripts   # keep this package out of the monorepo workspace
+node scripts/publish.mjs                           # builds, then publishes
+```
+
+`scripts/publish.mjs` obtains a short-lived token from the active `gcloud`
+account into a temporary npm config file, so no credentials are stored in the
+repository. Prerelease versions publish under the `beta` dist-tag; use
+`--tag <name>` to override and `--dry-run` to inspect the tarball first.
+
+> `--ignore-workspace` matters: this package intentionally stays outside
+> `pnpm-workspace.yaml`, so a root `pnpm install` for the framework never pulls
+> Test Manager dependencies.
+

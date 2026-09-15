@@ -1,6 +1,6 @@
 {
   "name": "@drumr/test-management",
-  "version": "1.0.0-beta.1",
+  "version": "1.0.0-beta.2",
   "description": "Drumr Test Manager extension and CLI presets. Parses, manages, and executes test suites (Unit, Integration, E2E) across a Drumr application workspace.",
   "main": "./dist/cli/commands/tests/open.js",
   "types": "./dist/cli/commands/tests/open.d.ts",
@@ -30,15 +30,26 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json && pnpm run copy-assets",
     "copy-assets": "node scripts/copy-assets.mjs",
-    "clean": "node scripts/clean.mjs"
+    "clean": "node scripts/clean.mjs",
+    "publish:gcp": "node scripts/publish.mjs"
   },
   "dependencies": {},
   "devDependencies": {
+    "@google-cloud/storage": "^7.14.0",
+    "@types/node": "^22.0.0",
     "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@google-cloud/storage": "^7.14.0"
+  },
+  "peerDependenciesMeta": {
+    "@google-cloud/storage": {
+      "optional": true
+    }
   },
   "license": "Apache-2.0",
   "publishConfig": {
-    "registry": "https://us-central1-npm.pkg.dev/future-name-492914-n5/drumr-npm/",
+    "registry": "https://us-central1-npm.pkg.dev/slingr-qa/drumr-npm/",
     "access": "restricted"
   }
 }

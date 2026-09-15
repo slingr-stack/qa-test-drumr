@@ -1,12 +1,10 @@
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getTestManagerDir = getTestManagerDir;
-exports.getRunStatusFilePath = getRunStatusFilePath;
-exports.getLatestRunPointerPath = getLatestRunPointerPath;
-exports.getTestPlansFilePath = getTestPlansFilePath;
+exports.LATEST_RUN_POINTER_KEY = exports.TEST_PLANS_KEY = exports.TEST_MANAGER_DIR_KEY = void 0;
+exports.getRunStatusKey = getRunStatusKey;
+exports.getRunLogKey = getRunLogKey;
+exports.getRunPayloadKey = getRunPayloadKey;
+exports.getRunCaseResultKey = getRunCaseResultKey;
 exports.writeRunStatus = writeRunStatus;
 exports.readRunStatus = readRunStatus;
 exports.readLatestRunStatus = readLatestRunStatus;
@@ -15,38 +13,28 @@ exports.initializeRunStatus = initializeRunStatus;
 exports.updateRunLifecycle = updateRunLifecycle;
 exports.updateRunCase = updateRunCase;
 exports.applyStatusesToTestPlans = applyStatusesToTestPlans;
-const node_path_1 = __importDefault(require("node:path"));
-const promises_1 = __importDefault(require("node:fs/promises"));
-async function pathExists(filePath) {
-    try {
-        await promises_1.default.access(filePath);
-        return true;
-    }
-    catch {
-        return false;
-    }
+/** Storage key prefix for every Test Manager artefact of a run. */
+exports.TEST_MANAGER_DIR_KEY = 'logs/test-manager';
+exports.TEST_PLANS_KEY = 'testsManagement/test-plans.json';
+exports.LATEST_RUN_POINTER_KEY = `${exports.TEST_MANAGER_DIR_KEY}/latest-run.json`;
+function getRunStatusKey(runId) {
+    return `${exports.TEST_MANAGER_DIR_KEY}/${runId}.status.json`;
 }
-const TEST_MANAGER_LOG_DIR = ['logs', 'test-manager'];
-const TEST_PLANS_PATH = ['testsManagement', 'test-plans.json'];
-const LATEST_RUN_POINTER = 'latest-run.json';
+function getRunLogKey(runId) {
+    return `${exports.TEST_MANAGER_DIR_KEY}/${runId}.log`;
+}
+function getRunPayloadKey(runId) {
+    return `${exports.TEST_MANAGER_DIR_KEY}/${runId}.payload.json`;
+}
+function getRunCaseResultKey(runId, index) {
+    return `${exports.TEST_MANAGER_DIR_KEY}/${runId}-case-${String(index + 1).padStart(3, '0')}.json`;
+}
 function withOptionalProps(base, optional) {
     const definedOptionalEntries = Object.entries(optional).filter(([, value]) => value !== undefined);
     return {
         ...base,
         ...Object.fromEntries(definedOptionalEntries),
     };
-}
-function getTestManagerDir(appRoot) {
-    return node_path_1.default.join(appRoot, ...TEST_MANAGER_LOG_DIR);
-}
-function getRunStatusFilePath(appRoot, runId) {
-    return node_path_1.default.join(getTestManagerDir(appRoot), `${runId}.status.json`);
-}
-function getLatestRunPointerPath(appRoot) {
-    return node_path_1.default.join(getTestManagerDir(appRoot), LATEST_RUN_POINTER);
-}
-function getTestPlansFilePath(appRoot) {
-    return node_path_1.default.join(appRoot, ...TEST_PLANS_PATH);
 }
 function buildProgress(cases) {
     const total = cases.length;
@@ -65,49 +53,40 @@ function buildProgress(cases) {
         percent: total === 0 ? 0 : Math.round((completed / total) * 100),
     };
 }
-async function writeLatestRunPointer(appRoot, runId) {
-    const pointerPath = getLatestRunPointerPath(appRoot);
-    await promises_1.default.mkdir(node_path_1.default.dirname(pointerPath), { recursive: true });
-    await promises_1.default.writeFile(pointerPath, JSON.stringify({ runId }, null, 2), 'utf-8');
+async function writeLatestRunPointer(storage, runId) {
+    await storage.writeText(exports.LATEST_RUN_POINTER_KEY, JSON.stringify({ runId }, null, 2));
 }
-async function writeRunStatus(appRoot, status) {
-    const filePath = getRunStatusFilePath(appRoot, status.runId);
+async function writeRunStatus(storage, status) {
     const normalizedStatus = {
         ...status,
         updatedAt: new Date().toISOString(),
         progress: buildProgress(status.cases),
     };
-    await promises_1.default.mkdir(node_path_1.default.dirname(filePath), { recursive: true });
-    await promises_1.default.writeFile(filePath, JSON.stringify(normalizedStatus, null, 2), 'utf-8');
-    await writeLatestRunPointer(appRoot, status.runId);
+    await storage.writeText(getRunStatusKey(status.runId), JSON.stringify(normalizedStatus, null, 2));
+    await writeLatestRunPointer(storage, status.runId);
 }
-async function readRunStatus(appRoot, runId) {
-    const filePath = getRunStatusFilePath(appRoot, runId);
-    if (!(await pathExists(filePath))) {
+async function readRunStatus(storage, runId) {
+    const content = await storage.readText(getRunStatusKey(runId));
+    if (content === null) {
         return null;
     }
-    const content = await promises_1.default.readFile(filePath, 'utf-8');
     return JSON.parse(content);
 }
-async function readLatestRunStatus(appRoot) {
-    const pointerPath = getLatestRunPointerPath(appRoot);
-    if (!(await pathExists(pointerPath))) {
+async function readLatestRunStatus(storage) {
+    const content = await storage.readText(exports.LATEST_RUN_POINTER_KEY);
+    if (content === null) {
         return null;
     }
-    const content = await promises_1.default.readFile(pointerPath, 'utf-8');
     const data = JSON.parse(content);
     if (!data.runId) {
         return null;
     }
-    return readRunStatus(appRoot, data.runId);
+    return readRunStatus(storage, data.runId);
 }
-async function clearLatestRunStatus(appRoot) {
-    const pointerPath = getLatestRunPointerPath(appRoot);
-    if (await pathExists(pointerPath)) {
-        await promises_1.default.rm(pointerPath, { recursive: true, force: true });
-    }
+async function clearLatestRunStatus(storage) {
+    await storage.deleteKey(exports.LATEST_RUN_POINTER_KEY);
 }
-async function initializeRunStatus(appRoot, input) {
+async function initializeRunStatus(storage, input) {
     const status = {
         runId: input.runId,
         label: input.label,
@@ -117,8 +96,8 @@ async function initializeRunStatus(appRoot, input) {
         progress: buildProgress(input.cases),
         cases: input.cases,
     };
-    await writeRunStatus(appRoot, status);
-    await applyStatusesToTestPlans(appRoot, input.cases.map(testCase => withOptionalProps({
+    await writeRunStatus(storage, status);
+    await applyStatusesToTestPlans(storage, input.cases.map(testCase => withOptionalProps({
         status: testCase.status,
     }, {
         caseId: testCase.caseId,
@@ -128,8 +107,8 @@ async function initializeRunStatus(appRoot, input) {
     })));
     return status;
 }
-async function updateRunLifecycle(appRoot, runId, lifecycle, extra = {}) {
-    const current = await readRunStatus(appRoot, runId);
+async function updateRunLifecycle(storage, runId, lifecycle, extra = {}) {
+    const current = await readRunStatus(storage, runId);
     if (!current) {
         return null;
     }
@@ -138,11 +117,11 @@ async function updateRunLifecycle(appRoot, runId, lifecycle, extra = {}) {
         lifecycle,
         ...extra,
     };
-    await writeRunStatus(appRoot, next);
+    await writeRunStatus(storage, next);
     return next;
 }
-async function updateRunCase(appRoot, runId, matcher, patch) {
-    const current = await readRunStatus(appRoot, runId);
+async function updateRunCase(storage, runId, matcher, patch) {
+    const current = await readRunStatus(storage, runId);
     if (!current) {
         return null;
     }
@@ -166,9 +145,9 @@ async function updateRunCase(appRoot, runId, matcher, patch) {
         ...current,
         cases: nextCases,
     };
-    await writeRunStatus(appRoot, next);
+    await writeRunStatus(storage, next);
     if (patch.status) {
-        await applyStatusesToTestPlans(appRoot, nextCases.map(testCase => withOptionalProps({
+        await applyStatusesToTestPlans(storage, nextCases.map(testCase => withOptionalProps({
             status: testCase.status,
         }, {
             caseId: testCase.caseId,
@@ -179,12 +158,11 @@ async function updateRunCase(appRoot, runId, matcher, patch) {
     }
     return next;
 }
-async function applyStatusesToTestPlans(appRoot, updates) {
-    const testPlansPath = getTestPlansFilePath(appRoot);
-    if (!(await pathExists(testPlansPath))) {
+async function applyStatusesToTestPlans(storage, updates) {
+    const content = await storage.readText(exports.TEST_PLANS_KEY);
+    if (content === null) {
         return;
     }
-    const content = await promises_1.default.readFile(testPlansPath, 'utf-8');
     const testPlans = JSON.parse(content);
     const plans = testPlans.plans ?? [];
     for (const plan of plans) {
@@ -201,6 +179,6 @@ async function applyStatusesToTestPlans(appRoot, updates) {
             }
         }
     }
-    await promises_1.default.writeFile(testPlansPath, JSON.stringify(testPlans, null, 2), 'utf-8');
+    await storage.writeText(exports.TEST_PLANS_KEY, JSON.stringify(testPlans, null, 2));
 }
 //# sourceMappingURL=testRunState.js.map

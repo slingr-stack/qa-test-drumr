@@ -2,6 +2,8 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 
 import { hasDrumrFramework } from '../../utils/checkFramework.js';
+import { TEST_PLANS_KEY } from '../../utils/testRunState.js';
+import { createStorageAdapter } from '../../utils/storage/index.js';
 
 const DEFAULT_TEST_PLANS: object = {
   plans: [],
@@ -9,7 +11,6 @@ const DEFAULT_TEST_PLANS: object = {
 };
 
 const TEST_MANAGEMENT_DIR = 'testsManagement';
-const TEST_PLANS_FILE = path.join(TEST_MANAGEMENT_DIR, 'test-plans.json');
 
 const E2E_DIRS = [
   'frontend/tests/e2e',
@@ -55,14 +56,13 @@ export async function setupTests(cwd: string = process.cwd()): Promise<void> {
     }
   }
 
-  const testPlansPath = path.join(cwd, TEST_PLANS_FILE);
+  const storage = await createStorageAdapter(cwd);
 
-  if (await pathExists(testPlansPath)) {
-    console.log(`  exists   ${path.relative(cwd, testPlansPath)} (skipped)`);
+  if (await storage.exists(TEST_PLANS_KEY)) {
+    console.log(`  exists   ${TEST_PLANS_KEY} (skipped)`);
   } else {
-    await fsp.mkdir(path.dirname(testPlansPath), { recursive: true });
-    await fsp.writeFile(testPlansPath, JSON.stringify(DEFAULT_TEST_PLANS, null, 2), 'utf-8');
-    console.log(`  created  ${path.relative(cwd, testPlansPath)}`);
+    await storage.writeText(TEST_PLANS_KEY, JSON.stringify(DEFAULT_TEST_PLANS, null, 2));
+    console.log(`  created  ${TEST_PLANS_KEY}`);
   }
 
   const summary = directoriesCreated > 0
@@ -70,5 +70,7 @@ export async function setupTests(cwd: string = process.cwd()): Promise<void> {
     : 'All directories already exist.';
 
   console.log(`\nTest infrastructure ready. ${summary}`);
+  console.log(`State storage: ${storage.kind}`);
   console.log('Run "drumr tests open" to launch the Test Manager UI.');
+  await storage.close();
 }

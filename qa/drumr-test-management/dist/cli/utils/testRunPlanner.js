@@ -10,6 +10,15 @@ const node_crypto_1 = __importDefault(require("node:crypto"));
 const node_path_1 = __importDefault(require("node:path"));
 const promises_1 = __importDefault(require("node:fs/promises"));
 const testRunState_1 = require("./testRunState");
+/**
+ * Test runners (Jest/Playwright) and the background process handoff require real
+ * filesystem paths, so execution artefacts always live under the app root.
+ * Only the run status and the log content are routed through the storage adapter.
+ */
+const TEST_MANAGER_LOG_DIR = ['logs', 'test-manager'];
+function getLocalTestManagerDir(appRoot) {
+    return node_path_1.default.join(appRoot, ...TEST_MANAGER_LOG_DIR);
+}
 function withOptionalProps(base, optional) {
     const definedOptionalEntries = Object.entries(optional).filter(([, value]) => value !== undefined);
     return {
@@ -60,7 +69,7 @@ function buildCommand(appRoot, runId, index, testCase) {
     const specFile = normalizeSpecFile(testCase.specFile);
     const testName = testCase.testName?.trim();
     const jestNamePattern = resolveJestTestNamePattern(testCase);
-    const resultFilePath = node_path_1.default.join((0, testRunState_1.getTestManagerDir)(appRoot), `${runId}-case-${String(index + 1).padStart(3, '0')}.json`);
+    const resultFilePath = node_path_1.default.join(getLocalTestManagerDir(appRoot), `${runId}-case-${String(index + 1).padStart(3, '0')}.json`);
     if (specFile.startsWith('backend/')) {
         const args = [
             'jest',
@@ -156,7 +165,7 @@ function planBackgroundTestRun(appRoot, label, cases) {
         return [`${specFile}::${testCase.fullName ?? testCase.testName ?? ''}`, testCase];
     })).values());
     const runId = `tm-${Date.now()}-${node_crypto_1.default.randomBytes(4).toString('hex')}`;
-    const logDir = node_path_1.default.join(appRoot, 'logs', 'test-manager');
+    const logDir = getLocalTestManagerDir(appRoot);
     const logFilePath = node_path_1.default.join(logDir, `${runId}.log`);
     return {
         runId,
@@ -166,7 +175,7 @@ function planBackgroundTestRun(appRoot, label, cases) {
         commands: dedupedCases.map((testCase, index) => buildCommand(appRoot, runId, index, testCase)),
     };
 }
-async function startBackgroundTestRun(appRoot, label, cases, spawnProcess = node_child_process_1.spawn) {
+async function startBackgroundTestRun(storage, appRoot, label, cases, spawnProcess = node_child_process_1.spawn) {
     const plan = planBackgroundTestRun(appRoot, label, cases);
     await promises_1.default.mkdir(node_path_1.default.dirname(plan.logFilePath), { recursive: true });
     const runCases = plan.commands.map(command => withOptionalProps({
@@ -179,7 +188,7 @@ async function startBackgroundTestRun(appRoot, label, cases, spawnProcess = node
         testName: command.testName,
         fullName: command.fullName,
     }));
-    await (0, testRunState_1.initializeRunStatus)(appRoot, {
+    await (0, testRunState_1.initializeRunStatus)(storage, {
         runId: plan.runId,
         label: plan.label,
         logFileRelativePath: plan.logFileRelativePath,

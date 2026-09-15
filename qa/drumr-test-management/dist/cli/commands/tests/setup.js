@@ -7,12 +7,13 @@ exports.setupTests = setupTests;
 const promises_1 = __importDefault(require("node:fs/promises"));
 const node_path_1 = __importDefault(require("node:path"));
 const checkFramework_js_1 = require("../../utils/checkFramework.js");
+const testRunState_js_1 = require("../../utils/testRunState.js");
+const index_js_1 = require("../../utils/storage/index.js");
 const DEFAULT_TEST_PLANS = {
     plans: [],
     caseFolders: [],
 };
 const TEST_MANAGEMENT_DIR = 'testsManagement';
-const TEST_PLANS_FILE = node_path_1.default.join(TEST_MANAGEMENT_DIR, 'test-plans.json');
 const E2E_DIRS = [
     'frontend/tests/e2e',
     'frontend/tests/e2e/fixtures',
@@ -49,19 +50,20 @@ async function setupTests(cwd = process.cwd()) {
             directoriesCreated++;
         }
     }
-    const testPlansPath = node_path_1.default.join(cwd, TEST_PLANS_FILE);
-    if (await pathExists(testPlansPath)) {
-        console.log(`  exists   ${node_path_1.default.relative(cwd, testPlansPath)} (skipped)`);
+    const storage = await (0, index_js_1.createStorageAdapter)(cwd);
+    if (await storage.exists(testRunState_js_1.TEST_PLANS_KEY)) {
+        console.log(`  exists   ${testRunState_js_1.TEST_PLANS_KEY} (skipped)`);
     }
     else {
-        await promises_1.default.mkdir(node_path_1.default.dirname(testPlansPath), { recursive: true });
-        await promises_1.default.writeFile(testPlansPath, JSON.stringify(DEFAULT_TEST_PLANS, null, 2), 'utf-8');
-        console.log(`  created  ${node_path_1.default.relative(cwd, testPlansPath)}`);
+        await storage.writeText(testRunState_js_1.TEST_PLANS_KEY, JSON.stringify(DEFAULT_TEST_PLANS, null, 2));
+        console.log(`  created  ${testRunState_js_1.TEST_PLANS_KEY}`);
     }
     const summary = directoriesCreated > 0
         ? `Created ${directoriesCreated} director${directoriesCreated === 1 ? 'y' : 'ies'}.`
         : 'All directories already exist.';
     console.log(`\nTest infrastructure ready. ${summary}`);
+    console.log(`State storage: ${storage.kind}`);
     console.log('Run "drumr tests open" to launch the Test Manager UI.');
+    await storage.close();
 }
 //# sourceMappingURL=setup.js.map
