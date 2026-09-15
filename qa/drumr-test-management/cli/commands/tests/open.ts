@@ -3,7 +3,7 @@ import fsp from 'node:fs/promises';
 import type { Server } from 'node:http';
 import path from 'node:path';
 
-import { hasDrumrFramework } from '../../utils/checkFramework.js';
+import { resolveTestManagerPaths } from '../../utils/checkFramework.js';
 import { findAvailablePort } from '../../utils/portChecker.js';
 import { createTestServer } from '../../utils/testServer.js';
 import { createStorageAdapter } from '../../utils/storage/index.js';
@@ -32,15 +32,18 @@ export async function openTests(
   options: OpenTestsOptions = {},
 ): Promise<void> {
   const { port: requestedPort = DEFAULT_PORT, noOpen = false } = options;
-  const testPlansPath = path.join(cwd, TEST_PLANS_PATH);
+  const paths = await resolveTestManagerPaths(cwd);
 
-  if (!(await hasDrumrFramework(cwd))) {
+  if (!paths) {
     console.error(
-      'This directory does not contain a Drumr application.\n' +
-        "Run this command from your app's root directory.",
+      'Could not find exactly one Drumr application next to the qa directory.\n' +
+        'Run this command from an application\'s qa directory.',
     );
     process.exit(1);
   }
+
+  const { appRoot, testManagerRoot } = paths;
+  const testPlansPath = path.join(testManagerRoot, TEST_PLANS_PATH);
 
   if (!(await pathExists(testPlansPath))) {
     console.error(
@@ -64,8 +67,8 @@ export async function openTests(
   const url = `http://localhost:${port}`;
   console.log(`Starting Drumr Test Manager at ${url} ...`);
 
-  const storage = await createStorageAdapter(cwd);
-  const server = await createTestServer(cwd, port, UI_HTML_PATH, storage);
+  const storage = await createStorageAdapter(testManagerRoot);
+  const server = await createTestServer(appRoot, testManagerRoot, port, UI_HTML_PATH, storage);
 
   if (!noOpen) {
     openBrowser(url);

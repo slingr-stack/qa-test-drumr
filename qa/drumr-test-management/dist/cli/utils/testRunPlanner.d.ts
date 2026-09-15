@@ -28,6 +28,6 @@ export interface BackgroundTestRunPlan {
     commands: BackgroundTestCommand[];
 }
 type SpawnProcess = (command: string, args: string[], options: SpawnOptions) => ChildProcess;
-export declare function planBackgroundTestRun(appRoot: string, label: string, cases: RunnableTestCase[]): BackgroundTestRunPlan;
-export declare function startBackgroundTestRun(storage: StorageAdapter, appRoot: string, label: string, cases: RunnableTestCase[], spawnProcess?: SpawnProcess): Promise<BackgroundTestRunPlan>;
+export declare function planBackgroundTestRun(appRoot: string, testManagerRoot: string, label: string, cases: RunnableTestCase[]): BackgroundTestRunPlan;
+export declare function startBackgroundTestRun(storage: StorageAdapter, appRoot: string, testManagerRoot: string, label: string, cases: RunnableTestCase[], spawnProcess?: SpawnProcess): Promise<BackgroundTestRunPlan>;
 export {};

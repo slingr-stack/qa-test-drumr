@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getBackendPath = getBackendPath;
 exports.hasDrumrFramework = hasDrumrFramework;
+exports.resolveTestManagerPaths = resolveTestManagerPaths;
 exports.getFrameworkPath = getFrameworkPath;
 const path = __importStar(require("node:path"));
 const promises_1 = __importDefault(require("node:fs/promises"));
@@ -64,6 +65,22 @@ async function hasDrumrFramework(cwd = process.cwd()) {
     const deps = packageJson.dependencies || {};
     const devDeps = packageJson.devDependencies || {};
     return !!deps['@drumr/framework-backend'] || !!devDeps['@drumr/framework-backend'];
+}
+async function resolveTestManagerPaths(qaRoot = process.cwd()) {
+    const workspaceRoot = path.resolve(qaRoot, '..');
+    const testManagerRoot = path.join(qaRoot, 'drumr-test-management');
+    if (await hasDrumrFramework(workspaceRoot)) {
+        return { appRoot: workspaceRoot, testManagerRoot };
+    }
+    const entries = await promises_1.default.readdir(workspaceRoot, { withFileTypes: true });
+    const applicationRoots = await Promise.all(entries
+        .filter(entry => entry.isDirectory() && entry.name !== 'qa')
+        .map(async (entry) => {
+        const candidate = path.join(workspaceRoot, entry.name);
+        return (await hasDrumrFramework(candidate)) ? candidate : null;
+    }));
+    const appRoot = applicationRoots.filter((candidate) => candidate !== null);
+    return appRoot.length === 1 ? { appRoot: appRoot[0], testManagerRoot } : null;
 }
 async function getFrameworkPath(cwd = process.cwd()) {
     const backendPath = getBackendPath(cwd);

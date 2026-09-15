@@ -5,7 +5,7 @@ import path from 'node:path';
 import type { StorageAdapter } from './storageAdapter.js';
 
 /**
- * Stores Test Manager state as files under the application root.
+ * Stores Test Manager state as files under the Test Manager root.
  *
  * This is the default adapter and preserves the historical on-disk layout
  * (`testsManagement/test-plans.json`, `logs/test-manager/...`), so existing

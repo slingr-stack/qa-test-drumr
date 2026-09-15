@@ -7,7 +7,7 @@ exports.LocalStorageAdapter = void 0;
 const promises_1 = __importDefault(require("node:fs/promises"));
 const node_path_1 = __importDefault(require("node:path"));
 /**
- * Stores Test Manager state as files under the application root.
+ * Stores Test Manager state as files under the Test Manager root.
  *
  * This is the default adapter and preserves the historical on-disk layout
  * (`testsManagement/test-plans.json`, `logs/test-manager/...`), so existing

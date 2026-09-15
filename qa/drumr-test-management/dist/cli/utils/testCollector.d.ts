@@ -8,3 +8,4 @@ export interface CollectedTest {
 }
 export declare function classifySpecFile(relPath: string): 'unit' | 'int' | 'e2e';
 export declare function collectTestsFromApp(appRoot: string): Promise<CollectedTest[]>;
+export declare function collectTestsFromAppAndManager(appRoot: string, testManagerRoot: string): Promise<CollectedTest[]>;

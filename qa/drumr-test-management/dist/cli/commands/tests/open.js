@@ -25,12 +25,14 @@ async function pathExists(filePath) {
 }
 async function openTests(cwd = process.cwd(), options = {}) {
     const { port: requestedPort = DEFAULT_PORT, noOpen = false } = options;
-    const testPlansPath = node_path_1.default.join(cwd, TEST_PLANS_PATH);
-    if (!(await (0, checkFramework_js_1.hasDrumrFramework)(cwd))) {
-        console.error('This directory does not contain a Drumr application.\n' +
-            "Run this command from your app's root directory.");
+    const paths = await (0, checkFramework_js_1.resolveTestManagerPaths)(cwd);
+    if (!paths) {
+        console.error('Could not find exactly one Drumr application next to the qa directory.\n' +
+            'Run this command from an application\'s qa directory.');
         process.exit(1);
     }
+    const { appRoot, testManagerRoot } = paths;
+    const testPlansPath = node_path_1.default.join(testManagerRoot, TEST_PLANS_PATH);
     if (!(await pathExists(testPlansPath))) {
         console.error('Required test infrastructure was not found in this application.\n' +
             `Missing file: ${testPlansPath}\n` +
@@ -47,8 +49,8 @@ async function openTests(cwd = process.cwd(), options = {}) {
     }
     const url = `http://localhost:${port}`;
     console.log(`Starting Drumr Test Manager at ${url} ...`);
-    const storage = await (0, index_js_1.createStorageAdapter)(cwd);
-    const server = await (0, testServer_js_1.createTestServer)(cwd, port, UI_HTML_PATH, storage);
+    const storage = await (0, index_js_1.createStorageAdapter)(testManagerRoot);
+    const server = await (0, testServer_js_1.createTestServer)(appRoot, testManagerRoot, port, UI_HTML_PATH, storage);
     if (!noOpen) {
         openBrowser(url);
     }
