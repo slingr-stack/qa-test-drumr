@@ -31,4 +31,4 @@ export interface TestPlansFile {
     caseFolders: TestPlanCaseFolder[];
     collectedTests?: CollectedTest[];
 }
-export declare function createTestServer(appRoot: string, port: number, htmlPath: string, storage: StorageAdapter): Promise<http.Server>;
+export declare function createTestServer(appRoot: string, testManagerRoot: string, port: number, htmlPath: string, storage: StorageAdapter): Promise<http.Server>;

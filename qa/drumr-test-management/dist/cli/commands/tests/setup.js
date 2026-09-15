@@ -35,22 +35,24 @@ async function pathExists(filePath) {
     }
 }
 async function setupTests(cwd = process.cwd()) {
-    if (!(await (0, checkFramework_js_1.hasDrumrFramework)(cwd))) {
-        console.error('This directory does not contain a Drumr application.\n' +
-            "Run this command from your app's root directory.");
+    const paths = await (0, checkFramework_js_1.resolveTestManagerPaths)(cwd);
+    if (!paths) {
+        console.error('Could not find exactly one Drumr application next to the qa directory.\n' +
+            'Run this command from an application\'s qa directory.');
         process.exit(1);
     }
+    const { testManagerRoot } = paths;
     const allDirs = [TEST_MANAGEMENT_DIR, ...E2E_DIRS, ...UNIT_DIRS, ...INTEGRATION_DIRS];
     let directoriesCreated = 0;
     for (const dir of allDirs) {
-        const abs = node_path_1.default.join(cwd, dir);
+        const abs = node_path_1.default.join(testManagerRoot, dir);
         if (!(await pathExists(abs))) {
             await promises_1.default.mkdir(abs, { recursive: true });
-            console.log(`  created  ${dir}/`);
+            console.log(`  created  drumr-test-management/${dir}/`);
             directoriesCreated++;
         }
     }
-    const storage = await (0, index_js_1.createStorageAdapter)(cwd);
+    const storage = await (0, index_js_1.createStorageAdapter)(testManagerRoot);
     if (await storage.exists(testRunState_js_1.TEST_PLANS_KEY)) {
         console.log(`  exists   ${testRunState_js_1.TEST_PLANS_KEY} (skipped)`);
     }

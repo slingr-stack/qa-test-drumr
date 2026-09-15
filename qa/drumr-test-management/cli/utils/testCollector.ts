@@ -159,3 +159,21 @@ export async function collectTestsFromApp(appRoot: string): Promise<CollectedTes
   }
   return results;
 }
+
+export async function collectTestsFromAppAndManager(
+  appRoot: string,
+  testManagerRoot: string,
+): Promise<CollectedTest[]> {
+  const [applicationTests, managerTests] = await Promise.all([
+    collectTestsFromApp(appRoot),
+    collectTestsFromApp(testManagerRoot),
+  ]);
+
+  return [
+    ...applicationTests,
+    ...managerTests.map(test => ({
+      ...test,
+      specFile: path.relative(appRoot, path.join(testManagerRoot, test.specFile)).replace(/\\/g, '/'),
+    })),
+  ];
+}

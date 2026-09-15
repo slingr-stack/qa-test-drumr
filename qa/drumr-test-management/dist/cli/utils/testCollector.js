@@ -5,6 +5,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.classifySpecFile = classifySpecFile;
 exports.collectTestsFromApp = collectTestsFromApp;
+exports.collectTestsFromAppAndManager = collectTestsFromAppAndManager;
 const promises_1 = __importDefault(require("node:fs/promises"));
 const node_path_1 = __importDefault(require("node:path"));
 const TEST_FILE_RE = /(?:\.integration)?\.(?:spec|test)\.tsx?$/;
@@ -145,5 +146,18 @@ async function collectTestsFromApp(appRoot) {
         }
     }
     return results;
+}
+async function collectTestsFromAppAndManager(appRoot, testManagerRoot) {
+    const [applicationTests, managerTests] = await Promise.all([
+        collectTestsFromApp(appRoot),
+        collectTestsFromApp(testManagerRoot),
+    ]);
+    return [
+        ...applicationTests,
+        ...managerTests.map(test => ({
+            ...test,
+            specFile: node_path_1.default.relative(appRoot, node_path_1.default.join(testManagerRoot, test.specFile)).replace(/\\/g, '/'),
+        })),
+    ];
 }
 //# sourceMappingURL=testCollector.js.map

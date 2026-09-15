@@ -49,6 +49,7 @@ interface BackgroundTestCommand {
 
 interface BackgroundRunnerPayload {
   appRoot: string;
+  testManagerRoot: string;
   runId: string;
   label: string;
   logFilePath: string;
@@ -165,7 +166,7 @@ async function run(): Promise<void> {
   const payloadContent = await fsp.readFile(payloadPath, 'utf-8');
   const payload = JSON.parse(payloadContent) as BackgroundRunnerPayload;
 
-  const storage = await createStorageAdapter(payload.appRoot);
+  const storage = await createStorageAdapter(payload.testManagerRoot);
   const writeLog = createLogWriter(storage, getRunLogKey(payload.runId));
 
   let exitCode = 0;
@@ -205,7 +206,7 @@ void run().catch(async error => {
   if (payloadPath && (await pathExists(payloadPath))) {
     const payloadContent = await fsp.readFile(payloadPath, 'utf-8');
     const payload = JSON.parse(payloadContent) as BackgroundRunnerPayload;
-    const storage = await createStorageAdapter(payload.appRoot);
+    const storage = await createStorageAdapter(payload.testManagerRoot);
     const writeLog = createLogWriter(storage, getRunLogKey(payload.runId));
 
     await writeLog(`[fatal] ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);

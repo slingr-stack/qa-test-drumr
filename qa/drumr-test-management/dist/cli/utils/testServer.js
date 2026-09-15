@@ -167,7 +167,7 @@ async function buildRunResponse(storage, appRoot, runId) {
         logTail: (await buildRunLogSummary(storage, appRoot, runId)) ?? '',
     };
 }
-async function createTestServer(appRoot, port, htmlPath, storage) {
+async function createTestServer(appRoot, testManagerRoot, port, htmlPath, storage) {
     let appName = node_path_1.default.basename(appRoot);
     try {
         const pkgContent = await promises_1.default.readFile(node_path_1.default.join(appRoot, 'package.json'), 'utf-8');
@@ -223,7 +223,7 @@ async function createTestServer(appRoot, port, htmlPath, storage) {
             }
             if (url === '/api/collect' && method === 'POST') {
                 try {
-                    const collectedTests = await (0, testCollector_js_1.collectTestsFromApp)(appRoot);
+                    const collectedTests = await (0, testCollector_js_1.collectTestsFromAppAndManager)(appRoot, testManagerRoot);
                     json(res, 200, { collectedTests });
                 }
                 catch (err) {
@@ -271,7 +271,7 @@ async function createTestServer(appRoot, port, htmlPath, storage) {
                     return;
                 }
                 try {
-                    const runPlan = await (0, testRunPlanner_1.startBackgroundTestRun)(storage, appRoot, data.label?.trim() || `Test Manager run (${cases.length} test${cases.length === 1 ? '' : 's'})`, cases);
+                    const runPlan = await (0, testRunPlanner_1.startBackgroundTestRun)(storage, appRoot, testManagerRoot, data.label?.trim() || `Test Manager run (${cases.length} test${cases.length === 1 ? '' : 's'})`, cases);
                     const response = await buildRunResponse(storage, appRoot, runPlan.runId);
                     json(res, 202, {
                         ok: true,
