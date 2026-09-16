@@ -1,7 +1,7 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-import { hasDrumrFramework } from '../../utils/checkFramework.js';
+import { resolveTestManagerPaths } from '../../utils/checkFramework.js';
 import { TEST_PLANS_KEY } from '../../utils/testRunState.js';
 import { createStorageAdapter } from '../../utils/storage/index.js';
 
@@ -36,27 +36,31 @@ async function pathExists(filePath: string): Promise<boolean> {
 }
 
 export async function setupTests(cwd: string = process.cwd()): Promise<void> {
-  if (!(await hasDrumrFramework(cwd))) {
+  const paths = await resolveTestManagerPaths(cwd);
+
+  if (!paths) {
     console.error(
-      'This directory does not contain a Drumr application.\n' +
-        "Run this command from your app's root directory.",
+      'Could not find exactly one Drumr application next to the qa directory.\n' +
+        'Run this command from an application\'s qa directory.',
     );
     process.exit(1);
   }
+
+  const { testManagerRoot } = paths;
 
   const allDirs = [TEST_MANAGEMENT_DIR, ...E2E_DIRS, ...UNIT_DIRS, ...INTEGRATION_DIRS];
   let directoriesCreated = 0;
 
   for (const dir of allDirs) {
-    const abs = path.join(cwd, dir);
+    const abs = path.join(testManagerRoot, dir);
     if (!(await pathExists(abs))) {
       await fsp.mkdir(abs, { recursive: true });
-      console.log(`  created  ${dir}/`);
+      console.log(`  created  drumr-test-management/${dir}/`);
       directoriesCreated++;
     }
   }
 
-  const storage = await createStorageAdapter(cwd);
+  const storage = await createStorageAdapter(testManagerRoot);
 
   if (await storage.exists(TEST_PLANS_KEY)) {
     console.log(`  exists   ${TEST_PLANS_KEY} (skipped)`);

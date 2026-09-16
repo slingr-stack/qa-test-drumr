@@ -102,7 +102,7 @@ async function run() {
     }
     const payloadContent = await promises_1.default.readFile(payloadPath, 'utf-8');
     const payload = JSON.parse(payloadContent);
-    const storage = await (0, index_js_1.createStorageAdapter)(payload.appRoot);
+    const storage = await (0, index_js_1.createStorageAdapter)(payload.testManagerRoot);
     const writeLog = createLogWriter(storage, (0, testRunState_1.getRunLogKey)(payload.runId));
     let exitCode = 0;
     await (0, testRunState_1.updateRunLifecycle)(storage, payload.runId, 'running', { startedAt: new Date().toISOString() });
@@ -133,7 +133,7 @@ void run().catch(async (error) => {
     if (payloadPath && (await pathExists(payloadPath))) {
         const payloadContent = await promises_1.default.readFile(payloadPath, 'utf-8');
         const payload = JSON.parse(payloadContent);
-        const storage = await (0, index_js_1.createStorageAdapter)(payload.appRoot);
+        const storage = await (0, index_js_1.createStorageAdapter)(payload.testManagerRoot);
         const writeLog = createLogWriter(storage, (0, testRunState_1.getRunLogKey)(payload.runId));
         await writeLog(`[fatal] ${error instanceof Error ? error.stack ?? error.message : String(error)}\n`);
         await (0, testRunState_1.updateRunLifecycle)(storage, payload.runId, 'failed', {

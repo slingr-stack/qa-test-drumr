@@ -248,10 +248,10 @@ pnpm add @drumr/test-management@beta
 
 ### Run
 
-From the root of the Drumr app (the directory containing `backend/package.json`):
+From the application's `qa/` directory. Test Manager detects the application in the parent directory, or a single sibling application such as `project-management-app/`:
 
 ```bash
-pnpm exec drumr-test-manager setup   # one-time: scaffold testsManagement/ and test dirs
+pnpm exec drumr-test-manager setup   # one-time: scaffold qa/drumr-test-management/
 pnpm exec drumr-test-manager open    # launches the UI on http://localhost:4000
 ```
 

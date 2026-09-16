@@ -1,7 +1,7 @@
 import http from 'node:http';
 import path from 'node:path';
 import fsp from 'node:fs/promises';
-import { collectTestsFromApp, type CollectedTest } from './testCollector.js';
+import { collectTestsFromAppAndManager, type CollectedTest } from './testCollector.js';
 import {
   clearLatestRunStatus,
   getRunLogKey,
@@ -246,6 +246,7 @@ async function buildRunResponse(storage: StorageAdapter, appRoot: string, runId:
 
 export async function createTestServer(
   appRoot: string,
+  testManagerRoot: string,
   port: number,
   htmlPath: string,
   storage: StorageAdapter,
@@ -310,7 +311,7 @@ appName = pkg.name as string;
 
       if (url === '/api/collect' && method === 'POST') {
         try {
-          const collectedTests = await collectTestsFromApp(appRoot);
+          const collectedTests = await collectTestsFromAppAndManager(appRoot, testManagerRoot);
           json(res, 200, { collectedTests });
         } catch (err) {
           json(res, 500, { error: getErrorMessage(err) });
@@ -363,6 +364,7 @@ appName = pkg.name as string;
           const runPlan = await startBackgroundTestRun(
             storage,
             appRoot,
+            testManagerRoot,
             data.label?.trim() || `Test Manager run (${cases.length} test${cases.length === 1 ? '' : 's'})`,
             cases,
           );

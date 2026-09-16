@@ -1,6 +1,6 @@
 {
   "name": "@drumr/test-management",
-  "version": "1.0.0-beta.2",
+  "version": "1.0.0-beta.3",
   "description": "Drumr Test Manager extension and CLI presets. Parses, manages, and executes test suites (Unit, Integration, E2E) across a Drumr application workspace.",
   "main": "./dist/cli/commands/tests/open.js",
   "types": "./dist/cli/commands/tests/open.d.ts",

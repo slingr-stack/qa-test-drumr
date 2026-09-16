@@ -1,6 +1,11 @@
 import * as path from 'node:path';
 import fsp from 'node:fs/promises';
 
+export interface TestManagerPaths {
+  appRoot: string;
+  testManagerRoot: string;
+}
+
 export function getBackendPath(cwd: string = process.cwd()): string {
   return path.join(cwd, 'backend');
 }
@@ -28,6 +33,28 @@ export async function hasDrumrFramework(cwd: string = process.cwd()): Promise<bo
   const devDeps = packageJson.devDependencies || {};
 
   return !!deps['@drumr/framework-backend'] || !!devDeps['@drumr/framework-backend'];
+}
+
+export async function resolveTestManagerPaths(qaRoot: string = process.cwd()): Promise<TestManagerPaths | null> {
+  const workspaceRoot = path.resolve(qaRoot, '..');
+  const testManagerRoot = path.join(qaRoot, 'drumr-test-management');
+
+  if (await hasDrumrFramework(workspaceRoot)) {
+    return { appRoot: workspaceRoot, testManagerRoot };
+  }
+
+  const entries = await fsp.readdir(workspaceRoot, { withFileTypes: true });
+  const applicationRoots = await Promise.all(
+    entries
+      .filter(entry => entry.isDirectory() && entry.name !== 'qa')
+      .map(async entry => {
+        const candidate = path.join(workspaceRoot, entry.name);
+        return (await hasDrumrFramework(candidate)) ? candidate : null;
+      }),
+  );
+  const appRoot = applicationRoots.filter((candidate): candidate is string => candidate !== null);
+
+  return appRoot.length === 1 ? { appRoot: appRoot[0], testManagerRoot } : null;
 }
 
 export async function getFrameworkPath(cwd: string = process.cwd()): Promise<string | null> {

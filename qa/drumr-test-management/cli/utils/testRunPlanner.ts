@@ -10,13 +10,13 @@ import type { StorageAdapter } from './storage/index.js';
 
 /**
  * Test runners (Jest/Playwright) and the background process handoff require real
- * filesystem paths, so execution artefacts always live under the app root.
+ * filesystem paths, so execution artefacts always live under the Test Manager root.
  * Only the run status and the log content are routed through the storage adapter.
  */
 const TEST_MANAGER_LOG_DIR = ['logs', 'test-manager'] as const;
 
-function getLocalTestManagerDir(appRoot: string): string {
-  return path.join(appRoot, ...TEST_MANAGER_LOG_DIR);
+function getLocalTestManagerDir(testManagerRoot: string): string {
+  return path.join(testManagerRoot, ...TEST_MANAGER_LOG_DIR);
 }
 
 export interface RunnableTestCase {
@@ -51,6 +51,7 @@ export interface BackgroundTestRunPlan {
 
 interface BackgroundRunnerPayload {
   appRoot: string;
+  testManagerRoot: string;
   runId: string;
   label: string;
   logFilePath: string;
@@ -113,13 +114,24 @@ function isE2eSpec(specFile: string): boolean {
   return specFile.includes('/tests/e2e/') || specFile.endsWith('.e2e.spec.ts') || specFile.endsWith('.e2e.spec.tsx');
 }
 
-function toWorkspaceRelativeSpec(specFile: string, workspace: 'backend' | 'frontend'): string {
-  const normalized = normalizeSpecFile(specFile);
-  const prefix = `${workspace}/`;
-  return normalized.startsWith(prefix) ? normalized.slice(prefix.length) : normalized;
+function toWorkspaceRelativeSpec(
+  appRoot: string,
+  specFile: string,
+  workspace: 'backend' | 'frontend',
+): string {
+  return path.relative(
+    path.join(appRoot, workspace),
+    path.join(appRoot, normalizeSpecFile(specFile)),
+  );
 }
 
-function buildCommand(appRoot: string, runId: string, index: number, testCase: RunnableTestCase): BackgroundTestCommand {
+function buildCommand(
+  appRoot: string,
+  testManagerRoot: string,
+  runId: string,
+  index: number,
+  testCase: RunnableTestCase,
+): BackgroundTestCommand {
   if (!testCase.specFile) {
     throw new Error(`Test case "${testCase.name}" is missing specFile.`);
   }
@@ -127,7 +139,7 @@ function buildCommand(appRoot: string, runId: string, index: number, testCase: R
   const specFile = normalizeSpecFile(testCase.specFile);
   const testName = testCase.testName?.trim();
   const jestNamePattern = resolveJestTestNamePattern(testCase);
-  const resultFilePath = path.join(getLocalTestManagerDir(appRoot), `${runId}-case-${String(index + 1).padStart(3, '0')}.json`);
+  const resultFilePath = path.join(getLocalTestManagerDir(testManagerRoot), `${runId}-case-${String(index + 1).padStart(3, '0')}.json`);
 
   if (specFile.startsWith('backend/')) {
     const args = [
@@ -138,7 +150,7 @@ function buildCommand(appRoot: string, runId: string, index: number, testCase: R
       '--json',
       '--outputFile',
       resultFilePath,
-      toWorkspaceRelativeSpec(specFile, 'backend'),
+      toWorkspaceRelativeSpec(appRoot, specFile, 'backend'),
     ];
     if (jestNamePattern) {
       args.push('--testNamePattern', jestNamePattern);
@@ -171,7 +183,7 @@ function buildCommand(appRoot: string, runId: string, index: number, testCase: R
       '--json',
       '--outputFile',
       resultFilePath,
-      toWorkspaceRelativeSpec(specFile, 'frontend'),
+      toWorkspaceRelativeSpec(appRoot, specFile, 'frontend'),
     ];
     if (jestNamePattern) {
       args.push('--testNamePattern', jestNamePattern);
@@ -223,6 +235,7 @@ function buildCommand(appRoot: string, runId: string, index: number, testCase: R
 
 export function planBackgroundTestRun(
   appRoot: string,
+  testManagerRoot: string,
   label: string,
   cases: RunnableTestCase[],
 ): BackgroundTestRunPlan {
@@ -240,7 +253,7 @@ export function planBackgroundTestRun(
   );
 
   const runId = `tm-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
-  const logDir = getLocalTestManagerDir(appRoot);
+  const logDir = getLocalTestManagerDir(testManagerRoot);
   const logFilePath = path.join(logDir, `${runId}.log`);
 
   return {
@@ -248,18 +261,19 @@ export function planBackgroundTestRun(
     label,
     logFilePath,
     logFileRelativePath: path.relative(appRoot, logFilePath),
-    commands: dedupedCases.map((testCase, index) => buildCommand(appRoot, runId, index, testCase)),
+    commands: dedupedCases.map((testCase, index) => buildCommand(appRoot, testManagerRoot, runId, index, testCase)),
   };
 }
 
 export async function startBackgroundTestRun(
   storage: StorageAdapter,
   appRoot: string,
+  testManagerRoot: string,
   label: string,
   cases: RunnableTestCase[],
   spawnProcess: SpawnProcess = spawn as unknown as SpawnProcess,
 ): Promise<BackgroundTestRunPlan> {
-  const plan = planBackgroundTestRun(appRoot, label, cases);
+  const plan = planBackgroundTestRun(appRoot, testManagerRoot, label, cases);
   await fsp.mkdir(path.dirname(plan.logFilePath), { recursive: true });
 
   const runCases: PersistentTestRunCase[] = plan.commands.map(command => withOptionalProps({
@@ -283,6 +297,7 @@ export async function startBackgroundTestRun(
   const payloadPath = path.join(path.dirname(plan.logFilePath), `${plan.runId}.payload.json`);
   const payload: BackgroundRunnerPayload = {
     appRoot,
+    testManagerRoot,
     runId: plan.runId,
     label: plan.label,
     logFilePath: plan.logFilePath,

@@ -29,14 +29,14 @@ function resolveStorageKind() {
 /**
  * Builds the storage adapter for a Test Manager process.
  *
- * Local storage keeps every artefact on disk under the application root, so the
+ * Local storage keeps every artefact on disk under the Test Manager root, so the
  * Test Manager works offline with zero configuration. Cloud Storage is opt-in
  * through `DRUMR_TEST_MANAGER_STORAGE=gcs` plus a bucket name.
  */
-async function createStorageAdapter(appRoot) {
+async function createStorageAdapter(testManagerRoot) {
     const kind = resolveStorageKind();
     if (kind === 'local') {
-        return new localStorageAdapter_js_1.LocalStorageAdapter(appRoot);
+        return new localStorageAdapter_js_1.LocalStorageAdapter(testManagerRoot);
     }
     const bucketName = (process.env[exports.STORAGE_BUCKET_ENV] ?? '').trim();
     if (!bucketName) {
@@ -45,7 +45,7 @@ async function createStorageAdapter(appRoot) {
             `  export ${exports.STORAGE_BUCKET_ENV}=my-drumr-test-manager-bucket`);
     }
     const configuredPrefix = (process.env[exports.STORAGE_PREFIX_ENV] ?? '').trim();
-    const prefix = configuredPrefix || node_path_1.default.basename(appRoot);
+    const prefix = configuredPrefix || node_path_1.default.basename(testManagerRoot);
     return gcsStorageAdapter_js_1.GcsStorageAdapter.create({ bucketName, prefix });
 }
 //# sourceMappingURL=index.js.map
