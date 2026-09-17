@@ -27,8 +27,7 @@ async function openTests(cwd = process.cwd(), options = {}) {
     const { port: requestedPort = DEFAULT_PORT, noOpen = false } = options;
     const paths = await (0, checkFramework_js_1.resolveTestManagerPaths)(cwd);
     if (!paths) {
-        console.error('Could not find exactly one Drumr application next to the qa directory.\n' +
-            'Run this command from an application\'s qa directory.');
+        console.error('Could not resolve the application root for Test Manager.');
         process.exit(1);
     }
     const { appRoot, testManagerRoot } = paths;

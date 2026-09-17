@@ -1,6 +1,10 @@
 import fsp from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import path from 'node:path';
+import {
+  BACKEND_TESTS_DIR_ENV,
+  FRONTEND_TESTS_DIR_ENV,
+} from './checkFramework.js';
 
 export interface CollectedTest {
   describeName: string;
@@ -137,7 +141,17 @@ continue;
 }
 
 export async function collectTestsFromApp(appRoot: string): Promise<CollectedTest[]> {
-  const specFiles = await findSpecFiles(appRoot);
+  const configuredRoots = [
+    process.env[BACKEND_TESTS_DIR_ENV] ?? path.join('backend', 'tests'),
+    process.env[FRONTEND_TESTS_DIR_ENV] ?? path.join('frontend', 'tests'),
+  ];
+  const specFiles = (await Promise.all(
+    configuredRoots.map(async root => {
+      const absoluteRoot = path.isAbsolute(root) ? root : path.join(appRoot, root);
+      const files = await findSpecFiles(absoluteRoot);
+      return files.map(file => path.relative(appRoot, path.join(absoluteRoot, file)));
+    }),
+  )).flat();
   const results: CollectedTest[] = [];
 
   for (const relPath of specFiles) {

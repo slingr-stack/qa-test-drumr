@@ -32,72 +32,22 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getBackendPath = getBackendPath;
-exports.hasDrumrFramework = hasDrumrFramework;
+exports.FRONTEND_TESTS_DIR_ENV = exports.BACKEND_TESTS_DIR_ENV = exports.APP_ROOT_ENV = void 0;
 exports.resolveTestManagerPaths = resolveTestManagerPaths;
-exports.getFrameworkPath = getFrameworkPath;
 const path = __importStar(require("node:path"));
-const promises_1 = __importDefault(require("node:fs/promises"));
-function getBackendPath(cwd = process.cwd()) {
-    return path.join(cwd, 'backend');
-}
-async function pathExists(filePath) {
-    try {
-        await promises_1.default.access(filePath);
-        return true;
-    }
-    catch {
-        return false;
-    }
-}
-async function hasDrumrFramework(cwd = process.cwd()) {
-    const backendPath = getBackendPath(cwd);
-    const packageJsonPath = path.join(backendPath, 'package.json');
-    if (!(await pathExists(packageJsonPath))) {
-        return false;
-    }
-    const content = await promises_1.default.readFile(packageJsonPath, 'utf-8');
-    const packageJson = JSON.parse(content);
-    const deps = packageJson.dependencies || {};
-    const devDeps = packageJson.devDependencies || {};
-    return !!deps['@drumr/framework-backend'] || !!devDeps['@drumr/framework-backend'];
-}
+exports.APP_ROOT_ENV = 'DRUMR_TEST_MANAGER_APP_ROOT';
+exports.BACKEND_TESTS_DIR_ENV = 'DRUMR_TEST_MANAGER_BACKEND_TESTS_DIR';
+exports.FRONTEND_TESTS_DIR_ENV = 'DRUMR_TEST_MANAGER_FRONTEND_TESTS_DIR';
 async function resolveTestManagerPaths(qaRoot = process.cwd()) {
-    const workspaceRoot = path.resolve(qaRoot, '..');
+    const resolvedQaRoot = path.resolve(qaRoot);
+    const configuredAppRoot = process.env[exports.APP_ROOT_ENV];
+    const appRoot = configuredAppRoot
+        ? path.resolve(resolvedQaRoot, configuredAppRoot)
+        : path.resolve(resolvedQaRoot, '..');
     const testManagerRoot = path.join(qaRoot, 'drumr-test-management');
-    if (await hasDrumrFramework(workspaceRoot)) {
-        return { appRoot: workspaceRoot, testManagerRoot };
-    }
-    const entries = await promises_1.default.readdir(workspaceRoot, { withFileTypes: true });
-    const applicationRoots = await Promise.all(entries
-        .filter(entry => entry.isDirectory() && entry.name !== 'qa')
-        .map(async (entry) => {
-        const candidate = path.join(workspaceRoot, entry.name);
-        return (await hasDrumrFramework(candidate)) ? candidate : null;
-    }));
-    const appRoot = applicationRoots.filter((candidate) => candidate !== null);
-    return appRoot.length === 1 ? { appRoot: appRoot[0], testManagerRoot } : null;
-}
-async function getFrameworkPath(cwd = process.cwd()) {
-    const backendPath = getBackendPath(cwd);
-    const candidates = [
-        path.join(backendPath, 'node_modules', '@drumr', 'framework-backend'),
-        path.join(cwd, 'node_modules', '@drumr', 'framework-backend'),
-    ];
-    for (const frameworkPath of candidates) {
-        if (!(await pathExists(frameworkPath))) {
-            continue;
-        }
-        const stats = await promises_1.default.lstat(frameworkPath);
-        if (stats.isSymbolicLink()) {
-            return await promises_1.default.realpath(frameworkPath);
-        }
-        return frameworkPath;
-    }
-    return null;
+    // Test Manager is useful for any application layout. Test directories are
+    // resolved by the collector and are allowed to be absent.
+    return { appRoot, testManagerRoot: path.resolve(testManagerRoot) };
 }
 //# sourceMappingURL=checkFramework.js.map

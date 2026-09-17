@@ -61,9 +61,21 @@ qa/drumr-test-management/
 `--no-open` to prevent opening a browser or `--port <number>` to select a
 different port.
 
-The application under test must have `backend/package.json` with
-`@drumr/framework-backend`. When the workspace root is not the application,
-Test Manager requires exactly one sibling directory that satisfies this check.
+By default, Test Manager collects test files from `backend/tests` and
+`frontend/tests` under the directory above `qa/`. These directories are
+optional; if either one is missing, Test Manager starts normally and simply
+collects no tests from that directory. Use these environment variables when
+the application uses a different layout:
+
+```bash
+export DRUMR_TEST_MANAGER_APP_ROOT=/path/to/application
+export DRUMR_TEST_MANAGER_BACKEND_TESTS_DIR=server/specs
+export DRUMR_TEST_MANAGER_FRONTEND_TESTS_DIR=client/specs
+```
+
+Test directory values are relative to the application root unless they are
+absolute paths. `DRUMR_TEST_MANAGER_APP_ROOT` is relative to `qa/` unless it
+is absolute.
 
 ## Share state through Cloud Storage
 

@@ -8,6 +8,7 @@ exports.collectTestsFromApp = collectTestsFromApp;
 exports.collectTestsFromAppAndManager = collectTestsFromAppAndManager;
 const promises_1 = __importDefault(require("node:fs/promises"));
 const node_path_1 = __importDefault(require("node:path"));
+const checkFramework_js_1 = require("./checkFramework.js");
 const TEST_FILE_RE = /(?:\.integration)?\.(?:spec|test)\.tsx?$/;
 const INTEGRATION_TEST_FILE_RE = /\.integration\.(?:spec|test)\.tsx?$/;
 function classifySpecFile(relPath) {
@@ -125,7 +126,15 @@ async function findSpecFiles(dir, rel = '') {
     return results;
 }
 async function collectTestsFromApp(appRoot) {
-    const specFiles = await findSpecFiles(appRoot);
+    const configuredRoots = [
+        process.env[checkFramework_js_1.BACKEND_TESTS_DIR_ENV] ?? node_path_1.default.join('backend', 'tests'),
+        process.env[checkFramework_js_1.FRONTEND_TESTS_DIR_ENV] ?? node_path_1.default.join('frontend', 'tests'),
+    ];
+    const specFiles = (await Promise.all(configuredRoots.map(async (root) => {
+        const absoluteRoot = node_path_1.default.isAbsolute(root) ? root : node_path_1.default.join(appRoot, root);
+        const files = await findSpecFiles(absoluteRoot);
+        return files.map(file => node_path_1.default.relative(appRoot, node_path_1.default.join(absoluteRoot, file)));
+    }))).flat();
     const results = [];
     for (const relPath of specFiles) {
         const normalized = relPath.replace(/\\/g, '/');

@@ -35,10 +35,7 @@ export async function openTests(
   const paths = await resolveTestManagerPaths(cwd);
 
   if (!paths) {
-    console.error(
-      'Could not find exactly one Drumr application next to the qa directory.\n' +
-        'Run this command from an application\'s qa directory.',
-    );
+    console.error('Could not resolve the application root for Test Manager.');
     process.exit(1);
   }
 
