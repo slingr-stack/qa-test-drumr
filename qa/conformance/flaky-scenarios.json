@@ -1,9 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Tracks known flaky scenarios across E2E, integration, and skill-conformance runs. A 'flaky' scenario is one that fails on first execution but passes on an immediate rerun without any code change. Entries are added manually when run-skill-conformance.js or Playwright reports a flaky classification. Resolved entries must keep status='resolved' and set resolvedDate.",
-  "lastUpdated": "2026-05-28",
-  "statuses": ["open", "investigating", "resolved"],
-  "types": ["e2e", "integration", "conformance"],
-  "failureClasses": ["flaky", "deterministic", "infra"],
-  "scenarios": []
-}

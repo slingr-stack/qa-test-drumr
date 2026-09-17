@@ -1,4 +1,0 @@
-{
-  "_comment": "Add entries here to suppress regression warnings for skills under active development. Expired entries (expires < today) are silently ignored — remove them when no longer needed.",
-  "exceptions": []
-}
