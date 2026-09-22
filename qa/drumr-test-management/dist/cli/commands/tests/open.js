@@ -31,6 +31,11 @@ async function openTests(cwd = process.cwd(), options = {}) {
         process.exit(1);
     }
     const { appRoot, testManagerRoot } = paths;
+    for (const [name, value] of Object.entries(paths.config.environment ?? {})) {
+        if (value !== undefined && process.env[name] === undefined) {
+            process.env[name] = value;
+        }
+    }
     const testPlansPath = node_path_1.default.join(testManagerRoot, TEST_PLANS_PATH);
     if (!(await pathExists(testPlansPath))) {
         console.error('Required test infrastructure was not found in this application.\n' +

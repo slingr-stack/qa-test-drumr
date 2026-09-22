@@ -1,0 +1,5 @@
+{
+  "appRoot": "../project-management-app",
+  "backendTestsDir": "backend/tests",
+  "frontendTestsDir": "frontend/tests"
+}

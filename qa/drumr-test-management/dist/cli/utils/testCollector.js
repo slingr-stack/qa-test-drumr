@@ -125,10 +125,11 @@ async function findSpecFiles(dir, rel = '') {
     }
     return results;
 }
-async function collectTestsFromApp(appRoot) {
+async function collectTestsFromApp(appRoot, testManagerRoot) {
+    const config = testManagerRoot ? await (0, checkFramework_js_1.loadTestManagerConfig)(testManagerRoot) : {};
     const configuredRoots = [
-        process.env[checkFramework_js_1.BACKEND_TESTS_DIR_ENV] ?? node_path_1.default.join('backend', 'tests'),
-        process.env[checkFramework_js_1.FRONTEND_TESTS_DIR_ENV] ?? node_path_1.default.join('frontend', 'tests'),
+        process.env[checkFramework_js_1.BACKEND_TESTS_DIR_ENV] ?? config.backendTestsDir ?? node_path_1.default.join('backend', 'tests'),
+        process.env[checkFramework_js_1.FRONTEND_TESTS_DIR_ENV] ?? config.frontendTestsDir ?? node_path_1.default.join('frontend', 'tests'),
     ];
     const specFiles = (await Promise.all(configuredRoots.map(async (root) => {
         const absoluteRoot = node_path_1.default.isAbsolute(root) ? root : node_path_1.default.join(appRoot, root);
@@ -158,7 +159,7 @@ async function collectTestsFromApp(appRoot) {
 }
 async function collectTestsFromAppAndManager(appRoot, testManagerRoot) {
     const [applicationTests, managerTests] = await Promise.all([
-        collectTestsFromApp(appRoot),
+        collectTestsFromApp(appRoot, testManagerRoot),
         collectTestsFromApp(testManagerRoot),
     ]);
     return [

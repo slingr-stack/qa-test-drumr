@@ -13,6 +13,11 @@ const DEFAULT_TEST_PLANS = {
     plans: [],
     caseFolders: [],
 };
+const DEFAULT_CONFIG = {
+    appRoot: '..',
+    backendTestsDir: 'backend/tests',
+    frontendTestsDir: 'frontend/tests',
+};
 const TEST_MANAGEMENT_DIR = 'testsManagement';
 const E2E_DIRS = [
     'frontend/tests/e2e',
@@ -50,6 +55,14 @@ async function setupTests(cwd = process.cwd()) {
             console.log(`  created  drumr-test-management/${dir}/`);
             directoriesCreated++;
         }
+    }
+    const configPath = node_path_1.default.join(testManagerRoot, checkFramework_js_1.TEST_MANAGER_CONFIG_FILENAME);
+    if (!(await pathExists(configPath))) {
+        await promises_1.default.writeFile(configPath, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, 'utf-8');
+        console.log(`  created  drumr-test-management/${checkFramework_js_1.TEST_MANAGER_CONFIG_FILENAME}`);
+    }
+    else {
+        console.log(`  exists   drumr-test-management/${checkFramework_js_1.TEST_MANAGER_CONFIG_FILENAME} (skipped)`);
     }
     const storage = await (0, index_js_1.createStorageAdapter)(testManagerRoot);
     if (await storage.exists(testRunState_js_1.TEST_PLANS_KEY)) {

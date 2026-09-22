@@ -128,11 +128,9 @@ function buildCommand(appRoot, testManagerRoot, runId, index, testCase) {
         });
     }
     if (isE2eSpec(specFile)) {
-        const args = ['run', 'test:e2e', '--', specFile, '--workers=1', '--reporter=json'];
-        if (testCase.fullName?.trim()) {
-            args.push('--grep', `^${escapeRegex(testCase.fullName.trim())}$`);
-        }
-        else if (testName) {
+        const executableSpecFile = specFile.startsWith('frontend/') ? `../${specFile}` : specFile;
+        const args = ['run', 'test:e2e', '--', executableSpecFile, '--workers=1', '--reporter=json'];
+        if (testName) {
             args.push('--grep', `${escapeRegex(testName)}$`);
         }
         return withOptionalProps({

@@ -49,6 +49,6 @@
     "access": "restricted"
   },
   "devDependencies": {
-    "@drumr/test-management": "1.0.0-beta.3"
+    "@drumr/test-management": "1.0.0-beta.5"
   }
 }

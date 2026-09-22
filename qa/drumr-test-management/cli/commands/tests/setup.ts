@@ -1,13 +1,23 @@
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-import { resolveTestManagerPaths } from '../../utils/checkFramework.js';
+import {
+  resolveTestManagerPaths,
+  TEST_MANAGER_CONFIG_FILENAME,
+  type TestManagerConfig,
+} from '../../utils/checkFramework.js';
 import { TEST_PLANS_KEY } from '../../utils/testRunState.js';
 import { createStorageAdapter } from '../../utils/storage/index.js';
 
 const DEFAULT_TEST_PLANS: object = {
   plans: [],
   caseFolders: [],
+};
+
+const DEFAULT_CONFIG: TestManagerConfig = {
+  appRoot: '..',
+  backendTestsDir: 'backend/tests',
+  frontendTestsDir: 'frontend/tests',
 };
 
 const TEST_MANAGEMENT_DIR = 'testsManagement';
@@ -55,6 +65,14 @@ export async function setupTests(cwd: string = process.cwd()): Promise<void> {
       console.log(`  created  drumr-test-management/${dir}/`);
       directoriesCreated++;
     }
+  }
+
+  const configPath = path.join(testManagerRoot, TEST_MANAGER_CONFIG_FILENAME);
+  if (!(await pathExists(configPath))) {
+    await fsp.writeFile(configPath, `${JSON.stringify(DEFAULT_CONFIG, null, 2)}\n`, 'utf-8');
+    console.log(`  created  drumr-test-management/${TEST_MANAGER_CONFIG_FILENAME}`);
+  } else {
+    console.log(`  exists   drumr-test-management/${TEST_MANAGER_CONFIG_FILENAME} (skipped)`);
   }
 
   const storage = await createStorageAdapter(testManagerRoot);

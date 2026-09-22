@@ -51,6 +51,7 @@ pnpm exec drumr-test-manager open
 
 ```text
 qa/drumr-test-management/
+  config.json
   testsManagement/test-plans.json
   frontend/tests/e2e/
   backend/tests/unit/
@@ -61,21 +62,28 @@ qa/drumr-test-management/
 `--no-open` to prevent opening a browser or `--port <number>` to select a
 different port.
 
-By default, Test Manager collects test files from `backend/tests` and
-`frontend/tests` under the directory above `qa/`. These directories are
-optional; if either one is missing, Test Manager starts normally and simply
-collects no tests from that directory. Use these environment variables when
-the application uses a different layout:
+`config.json` stores the application root and test directories for this app.
+`setup` creates it with defaults and never overwrites an existing file. Edit it
+to match a non-standard app layout:
 
-```bash
-export DRUMR_TEST_MANAGER_APP_ROOT=/path/to/application
-export DRUMR_TEST_MANAGER_BACKEND_TESTS_DIR=server/specs
-export DRUMR_TEST_MANAGER_FRONTEND_TESTS_DIR=client/specs
+```json
+{
+  "appRoot": "../project-management-app",
+  "backendTestsDir": "backend/tests",
+  "frontendTestsDir": "frontend/tests",
+  "environment": {
+    "E2E_BASE_URL": "https://example.test",
+    "E2E_API_BASE_URL": "https://example.test"
+  }
+}
 ```
 
-Test directory values are relative to the application root unless they are
-absolute paths. `DRUMR_TEST_MANAGER_APP_ROOT` is relative to `qa/` unless it
-is absolute.
+`appRoot` is relative to `qa/`; test directory paths are relative to the app
+root. Absolute paths are also accepted. Only non-secret E2E URLs should be
+stored in this file. Environment variables `DRUMR_TEST_MANAGER_APP_ROOT`,
+`DRUMR_TEST_MANAGER_BACKEND_TESTS_DIR`, `DRUMR_TEST_MANAGER_FRONTEND_TESTS_DIR`,
+`E2E_BASE_URL`, and `E2E_API_BASE_URL` override their config values for a
+single shell session.
 
 ## Share state through Cloud Storage
 

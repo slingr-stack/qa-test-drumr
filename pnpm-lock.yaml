@@ -231,8 +231,8 @@ importers:
         version: 1.61.1
     devDependencies:
       '@drumr/test-management':
-        specifier: 1.0.0-beta.3
-        version: 1.0.0-beta.3(@google-cloud/storage@7.21.0(encoding@0.1.13))
+        specifier: 1.0.0-beta.5
+        version: 1.0.0-beta.5(@google-cloud/storage@7.21.0(encoding@0.1.13))
 
 packages:
 
@@ -1426,8 +1426,8 @@ packages:
     resolution: {integrity: sha512-C75gjgucwVEK3DIGkLOcdcZVbLrzJnTlXzs6YqeNxpccJS6nMkv0ecDHGL5qoGHrfyC6QmhJsp9fLlg6eBqAsw==, tarball: https://us-central1-npm.pkg.dev/future-name-492914-n5/drumr-npm-virtual/@drumr/framework-frontend/-/@drumr/framework-frontend-1.0.0-beta.14.tgz}
     engines: {node: '>=20.0.0'}
 
-  '@drumr/test-management@1.0.0-beta.3':
-    resolution: {integrity: sha512-e820oWpoyfG93kRAKpnP5sxAX+He5d56IX1n406DVheq4fnzlbcdjsw6O9jy6UGyMts0ppzqGjIQhj6GDVsvyA==, tarball: https://us-central1-npm.pkg.dev/slingr-qa/drumr-npm/@drumr/test-management/-/@drumr/test-management-1.0.0-beta.3.tgz}
+  '@drumr/test-management@1.0.0-beta.5':
+    resolution: {integrity: sha512-J6iVNycmtlW5YqnVgcF/CEalsQwoDTNAO8z2obDU8Gmxleq1bP+1GXIM1HUdtAeslBSw42FXDxCVm4gZZXW75A==, tarball: https://us-central1-npm.pkg.dev/slingr-qa/drumr-npm/@drumr/test-management/-/@drumr/test-management-1.0.0-beta.5.tgz}
     hasBin: true
     peerDependencies:
       '@google-cloud/storage': ^7.14.0
@@ -3629,9 +3629,6 @@ packages:
 
   '@types/node@22.20.0':
     resolution: {integrity: sha512-QWlFW2wf3nTjC13/DqRnBpR4ZO36VJH/JVBkA/vcnmbTBNQIlnObqyqZE1tUR7+Ni23Lda8R1BxMfbXRpCUx5g==}
-
-  '@types/node@22.20.3':
-    resolution: {integrity: sha512-DZmzkmwHzXrLPAXPyKNDzlIwMMUZCVacoD25ywdy5YTKGbOx/2ld+Q38Im2zJ0vBuZP5Prd3VZutKZyXwkOS8A==}
 
   '@types/node@24.13.2':
     resolution: {integrity: sha512-fRa09kZTgu8o71KFcDjUFuc7F+dEbZYZmkI0mg5YBTRs0yMKjYHsq/c0urDKeDb+D5qVgXOdFcuu+DZPKOITwA==}
@@ -12832,7 +12829,7 @@ snapshots:
       - subscriptions-transport-ws
       - supports-color
 
-  '@drumr/test-management@1.0.0-beta.3(@google-cloud/storage@7.21.0(encoding@0.1.13))':
+  '@drumr/test-management@1.0.0-beta.5(@google-cloud/storage@7.21.0(encoding@0.1.13))':
     optionalDependencies:
       '@google-cloud/storage': 7.21.0(encoding@0.1.13)
 
@@ -15167,7 +15164,7 @@ snapshots:
 
   '@types/history@5.0.0':
     dependencies:
-      history: 4.10.1
+      history: 5.3.0
 
   '@types/hoist-non-react-statics@3.3.7(@types/react@19.2.17)':
     dependencies:
@@ -15233,10 +15230,6 @@ snapshots:
     dependencies:
       undici-types: 6.21.0
 
-  '@types/node@22.20.3':
-    dependencies:
-      undici-types: 6.21.0
-
   '@types/node@24.13.2':
     dependencies:
       undici-types: 7.18.2
@@ -15295,7 +15288,7 @@ snapshots:
       '@types/history': 4.7.11
       '@types/react': 19.3.0
       '@types/react-router': 5.1.20
-      redux: 3.7.2
+      redux: 4.2.1
 
   '@types/react-router@5.1.20':
     dependencies:
@@ -20198,7 +20191,7 @@ snapshots:
 
   jest-worker@27.5.1:
     dependencies:
-      '@types/node': 22.20.3
+      '@types/node': 24.13.2
       merge-stream: 2.0.0
       supports-color: 8.1.1
 

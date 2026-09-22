@@ -4,6 +4,7 @@ import path from 'node:path';
 import {
   BACKEND_TESTS_DIR_ENV,
   FRONTEND_TESTS_DIR_ENV,
+  loadTestManagerConfig,
 } from './checkFramework.js';
 
 export interface CollectedTest {
@@ -140,10 +141,14 @@ continue;
   return results;
 }
 
-export async function collectTestsFromApp(appRoot: string): Promise<CollectedTest[]> {
+export async function collectTestsFromApp(
+  appRoot: string,
+  testManagerRoot?: string,
+): Promise<CollectedTest[]> {
+  const config = testManagerRoot ? await loadTestManagerConfig(testManagerRoot) : {};
   const configuredRoots = [
-    process.env[BACKEND_TESTS_DIR_ENV] ?? path.join('backend', 'tests'),
-    process.env[FRONTEND_TESTS_DIR_ENV] ?? path.join('frontend', 'tests'),
+    process.env[BACKEND_TESTS_DIR_ENV] ?? config.backendTestsDir ?? path.join('backend', 'tests'),
+    process.env[FRONTEND_TESTS_DIR_ENV] ?? config.frontendTestsDir ?? path.join('frontend', 'tests'),
   ];
   const specFiles = (await Promise.all(
     configuredRoots.map(async root => {
@@ -179,7 +184,7 @@ export async function collectTestsFromAppAndManager(
   testManagerRoot: string,
 ): Promise<CollectedTest[]> {
   const [applicationTests, managerTests] = await Promise.all([
-    collectTestsFromApp(appRoot),
+    collectTestsFromApp(appRoot, testManagerRoot),
     collectTestsFromApp(testManagerRoot),
   ]);
 

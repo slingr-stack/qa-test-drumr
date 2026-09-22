@@ -40,6 +40,11 @@ export async function openTests(
   }
 
   const { appRoot, testManagerRoot } = paths;
+  for (const [name, value] of Object.entries(paths.config.environment ?? {})) {
+    if (value !== undefined && process.env[name] === undefined) {
+      process.env[name] = value;
+    }
+  }
   const testPlansPath = path.join(testManagerRoot, TEST_PLANS_PATH);
 
   if (!(await pathExists(testPlansPath))) {
