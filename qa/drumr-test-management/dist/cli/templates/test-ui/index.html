@@ -415,13 +415,13 @@
     .multiselect-toolbar {
       padding: 10px 16px; border-bottom: 1px solid var(--border);
       background: linear-gradient(180deg, rgba(47,129,247,0.06), rgba(47,129,247,0.02));
-      display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; flex-shrink: 0;
     }
     .multiselect-info {
-      font-size: 12px; color: var(--text); font-weight: 500; flex: 1;
+      font-size: 12px; color: var(--text); font-weight: 500; flex: 1 1 100%;
     }
     .multiselect-actions {
-      display: flex; gap: 8px;
+      display: flex; gap: 8px; flex-wrap: wrap;
     }
 
     /* ── Drag & Drop ───────────────────────────────────────────────────────── */
@@ -1062,7 +1062,7 @@ function renderContent() {
         ${iconPlay(12)} Run ${selectedCount}/${totalCases} in Background
       </button>
       <button class="btn btn-secondary" onclick="openAddCaseModal('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}')">
-        ${iconPlus(12)} Add Case
+        ${iconPlus(12)} Add Cases
       </button>`;
     renderCycleContent(panel, plan, cycle);
     return;
@@ -1126,7 +1126,20 @@ function renderPlanContent(el, plan) {
 }
 
 function renderCycleContent(el, plan, cycle) {
-  let html = `<div class="tc-grid">`;
+  const selectedCount = getSelectedCasesForCycle(plan.id, cycle.id).length;
+  let html = '';
+  if (selectedCount > 0) {
+    html += `
+      <div class="multiselect-toolbar">
+        <div class="multiselect-info">${selectedCount} test case${selectedCount !== 1 ? 's' : ''} selected</div>
+        <div class="multiselect-actions">
+          <button class="btn btn-danger" onclick="removeSelectedCycleCases('${escJsAttr(plan.id)}','${escJsAttr(cycle.id)}')">
+            ${iconTrash()} Remove selected
+          </button>
+        </div>
+      </div>`;
+  }
+  html += `<div class="tc-grid">`;
   if (cycle.cases.length === 0) {
     el.innerHTML = emptyState('No test cases', 'Add cases from the Test Cases panel or click "Add Case".');
     return;
@@ -1163,6 +1176,9 @@ function renderCollectedContent(el, tests) {
         <div class="multiselect-info">${selectedCount} test case${selectedCount !== 1 ? 's' : ''} selected</div>
         <div class="multiselect-actions">
           <button class="btn btn-secondary" onclick="clearMultiSelect()">Clear</button>
+          <button class="btn btn-secondary" onclick="showAddSelectedToCycleModal(event)" ${S.plans.some(plan => plan.cycles?.length) ? '' : 'disabled'}>
+            ${iconPlus(12)} Add to Cycle
+          </button>
           <button class="btn btn-primary" onclick="showMoveToFolderModal(event)">
             ${iconMove(12)} Move to Folder
           </button>
@@ -1631,6 +1647,113 @@ function showMoveToFolderModal(event) {
   setTimeout(() => document.getElementById('modal-target-folder')?.focus(), 50);
 }
 
+function showAddSelectedToCycleModal(event) {
+  event?.stopPropagation?.();
+  const selectedTests = Array.from(S.multiSelectTests)
+    .map(ref => S.collectedTests.find(test => tcRef(test) === ref))
+    .filter(Boolean);
+  const cycles = S.plans.flatMap(plan => (plan.cycles || []).map(cycle => ({ plan, cycle })));
+  if (selectedTests.length === 0) {
+    showToast('No tests selected.', 'error');
+    return;
+  }
+  if (cycles.length === 0) {
+    showToast('Create a test cycle before adding test cases.', 'error');
+    return;
+  }
+
+  let cycleOptionsHtml = '';
+  for (const plan of S.plans) {
+    if (!plan.cycles?.length) continue;
+    cycleOptionsHtml += `<optgroup label="${esc(plan.name)}">`;
+    for (const cycle of plan.cycles) {
+      cycleOptionsHtml += `<option value="${escAttr(plan.id)}|${escAttr(cycle.id)}">${esc(cycle.name)}</option>`;
+    }
+    cycleOptionsHtml += '</optgroup>';
+  }
+
+  document.getElementById('modal-container').innerHTML = `
+    <div class="modal-backdrop" onclick="closeModal(event)">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h3>Add Test Cases to Cycle</h3>
+          <button class="modal-close" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Selected Test Cases</label>
+            <div style="font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 10px;max-height:160px;overflow-y:auto;">
+              ${selectedTests.map(test => `<div style="padding:4px 0;font-size:11px;">${esc(test.displayName)}</div>`).join('')}
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">${selectedTests.length} test case${selectedTests.length !== 1 ? 's' : ''}</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="modal-cycle-target">Target Cycle</label>
+            <select id="modal-cycle-target" class="form-select">${cycleOptionsHtml}</select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+          <button class="btn btn-primary" onclick="addSelectedTestsToCycle()">Add ${selectedTests.length}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function addSelectedTestsToCycle() {
+  const cycleTarget = document.getElementById('modal-cycle-target')?.value;
+  if (!cycleTarget) return;
+  const [planId, cycleId] = cycleTarget.split('|');
+  const plan = S.plans.find(item => item.id === planId);
+  const cycle = plan?.cycles.find(item => item.id === cycleId);
+  if (!cycle) return;
+
+  const selectedTests = Array.from(S.multiSelectTests)
+    .map(ref => S.collectedTests.find(test => tcRef(test) === ref))
+    .filter(Boolean);
+  if (selectedTests.length === 0) {
+    showToast('No tests selected.', 'error');
+    return;
+  }
+
+  const allCases = S.plans.flatMap(item => item.cycles.flatMap(testCycle => testCycle.cases));
+  let addedCount = 0;
+  let skippedCount = 0;
+  for (const test of selectedTests) {
+    const alreadyAdded = cycle.cases.some(testCase =>
+      testCase.specFile === test.specFile &&
+      (testCase.fullName && test.fullName
+        ? testCase.fullName === test.fullName
+        : testCase.testName === test.testName),
+    );
+    if (alreadyAdded) {
+      skippedCount++;
+      continue;
+    }
+
+    const testCase = {
+      id: nextId('TC', allCases),
+      name: test.displayName,
+      specFile: test.specFile,
+      testName: test.testName,
+      fullName: test.fullName,
+      status: 'pending',
+      steps: [],
+    };
+    cycle.cases.push(testCase);
+    allCases.push(testCase);
+    addedCount++;
+  }
+
+  S.multiSelectTests.clear();
+  saveTestPlans();
+  closeModal();
+  renderSidebar();
+  renderContent();
+  const result = `Added ${addedCount} test case${addedCount !== 1 ? 's' : ''} to ${plan.name} / ${cycle.name}`;
+  showToast(skippedCount > 0 ? `${result}; skipped ${skippedCount} already in the cycle` : result, 'success');
+}
+
 function performMoveTests() {
   const targetFolderId = document.getElementById('modal-target-folder')?.value;
   if (targetFolderId === undefined) return;
@@ -1999,6 +2122,26 @@ function removeCase(planId, cycleId, caseId) {
   showToast('Case removed', 'info');
 }
 
+function removeSelectedCycleCases(planId, cycleId) {
+  const selectedCases = getSelectedCasesForCycle(planId, cycleId);
+  if (selectedCases.length === 0) return;
+  const count = selectedCases.length;
+  if (!confirm(`Remove ${count} selected test case${count === 1 ? '' : 's'} from this cycle?`)) return;
+
+  const plan = S.plans.find(item => item.id === planId);
+  const cycle = plan?.cycles.find(item => item.id === cycleId);
+  if (!cycle) return;
+  const selectedIds = new Set(selectedCases.map(({ testCase }) => testCase.id));
+  cycle.cases = cycle.cases.filter(testCase => !selectedIds.has(testCase.id));
+  for (const caseId of selectedIds) {
+    delete S.caseSelection[getCaseSelectionKey(planId, cycleId, caseId)];
+  }
+
+  saveTestPlans();
+  render();
+  showToast(`Removed ${count} test case${count === 1 ? '' : 's'} from the cycle`, 'success');
+}
+
 function updateCaseStatus(planId, cycleId, caseId, status) {
   const plan = S.plans.find(p => p.id === planId);
   const cycle = plan?.cycles.find(c => c.id === cycleId);
@@ -2096,19 +2239,14 @@ function openAddCaseModal(planId, cycleId) {
   const cycle = plan?.cycles.find(c => c.id === cycleId);
   if (!cycle) return;
 
-  const grouped = {};
-  for (const t of S.collectedTests) {
-    if (!grouped[t.type]) grouped[t.type] = [];
-    grouped[t.type].push(t);
-  }
-  let optionsHtml = '<option value="">— custom case —</option>';
-  for (const [type, tests] of Object.entries(grouped)) {
-    optionsHtml += `<optgroup label="${type.toUpperCase()}">`;
-    for (const t of tests) {
-      optionsHtml += `<option value="${esc(t.displayName)}" data-spec="${esc(t.specFile)}" data-test="${esc(t.testName)}" data-full-name="${esc(t.fullName || '')}">${esc(t.displayName)}</option>`;
-    }
-    optionsHtml += '</optgroup>';
-  }
+  const collectedTestsHtml = S.collectedTests.map(test => {
+    const ref = tcRef(test);
+    return `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;">
+      <input type="checkbox" name="modal-collected-tests" value="${escAttr(ref)}" />
+      <span style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(test.displayName)}</span>
+      <span class="form-hint">${esc(test.specFile || '')}</span>
+    </label>`;
+  }).join('');
 
   const html = `
     <div class="modal-backdrop" onclick="closeModal(event)">
@@ -2119,25 +2257,85 @@ function openAddCaseModal(planId, cycleId) {
         </div>
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label">From Test Cases</label>
-            <select id="modal-collected" class="form-select" onchange="onCollectedSelect(this)">${optionsHtml}</select>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <label class="form-label">From Test Cases</label>
+              <label class="form-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" onchange="setCycleAddSelection(this.checked)" /> Select all
+              </label>
+            </div>
+            <div style="border:1px solid var(--border);border-radius:6px;max-height:220px;overflow-y:auto;">
+              ${collectedTestsHtml || '<div class="form-hint" style="padding:10px;">No collected tests. You can still add a custom case below.</div>'}
+            </div>
           </div>
           <div class="form-group">
-            <label class="form-label">Case Name</label>
-            <input id="modal-name" class="form-input" placeholder="Test case name" />
-          </div>
-          <div class="form-group">
-            <label class="form-label">Spec File <span class="form-hint">(optional)</span></label>
-            <input id="modal-spec" class="form-input" placeholder="e.g. frontend/tests/e2e/auth.spec.ts" />
+            <label class="form-label">Custom Case <span class="form-hint">(optional)</span></label>
+            <input id="modal-name" class="form-input" placeholder="Case name" />
+            <input id="modal-spec" class="form-input" style="margin-top:8px;" placeholder="Spec file (optional)" />
           </div>
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-          <button class="btn btn-primary" onclick="addCase('${escJsAttr(planId)}','${escJsAttr(cycleId)}')">Add Case</button>
+          <button class="btn btn-secondary" onclick="addSelectedCollectedTests('${escJsAttr(planId)}','${escJsAttr(cycleId)}')">Add Selected Tests</button>
+          <button class="btn btn-primary" onclick="addCase('${escJsAttr(planId)}','${escJsAttr(cycleId)}')">Add Custom Case</button>
         </div>
       </div>
     </div>`;
   document.getElementById('modal-container').innerHTML = html;
+}
+
+function setCycleAddSelection(checked) {
+  document.querySelectorAll('input[name="modal-collected-tests"]').forEach(input => {
+    input.checked = checked;
+  });
+}
+
+function addSelectedCollectedTests(planId, cycleId) {
+  const selectedRefs = new Set(Array.from(
+    document.querySelectorAll('input[name="modal-collected-tests"]:checked'),
+    input => input.value,
+  ));
+  if (selectedRefs.size === 0) {
+    showToast('Select at least one collected test.', 'error');
+    return;
+  }
+
+  const plan = S.plans.find(item => item.id === planId);
+  const cycle = plan?.cycles.find(item => item.id === cycleId);
+  if (!cycle) return;
+  const allCases = S.plans.flatMap(item => item.cycles.flatMap(testCycle => testCycle.cases));
+  let addedCount = 0;
+  let skippedCount = 0;
+  for (const test of S.collectedTests.filter(item => selectedRefs.has(tcRef(item)))) {
+    const duplicate = cycle.cases.some(testCase =>
+      testCase.specFile === test.specFile &&
+      (testCase.fullName && test.fullName
+        ? testCase.fullName === test.fullName
+        : testCase.testName === test.testName),
+    );
+    if (duplicate) {
+      skippedCount++;
+      continue;
+    }
+
+    const testCase = {
+      id: nextId('TC', allCases),
+      name: test.displayName,
+      specFile: test.specFile,
+      testName: test.testName,
+      fullName: test.fullName,
+      status: 'pending',
+      steps: [],
+    };
+    cycle.cases.push(testCase);
+    allCases.push(testCase);
+    addedCount++;
+  }
+
+  saveTestPlans();
+  closeModal();
+  render();
+  const addedLabel = `Added ${addedCount} test case${addedCount === 1 ? '' : 's'}`;
+  showToast(skippedCount ? `${addedLabel}; skipped ${skippedCount} already in the cycle` : addedLabel, 'success');
 }
 
 function onCollectedSelect(sel) {
